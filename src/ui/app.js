@@ -3,18 +3,21 @@ import { checkServerAvailability, scanGitHub, scanRawArtifacts, scanWebsiteUrl }
 import { renderTopologySvg } from './graph.js';
 import { exportDomainsCsv, exportReportJson, exportReportMarkdown } from './export.js';
 import { createSubdomainsController } from './subdomains.js';
+import { createSourceAnalyzerController } from './source-analyzer.js';
+import { createApiInspectorController } from './api-inspector.js';
+import { createVaultController } from './vault.js';
 
 const STORAGE_KEYS = {
-  HISTORY: 'devtrace_history_v1',
-  SETTINGS: 'devtrace_settings_v1',
-  THEME: 'devtrace_theme_v1',
-  GH_TOKEN: 'devtrace_gh_token_session'
+  HISTORY: 'devtracer_history_v2',
+  LEGACY_HISTORY: 'devtrace_history_v1',
+  SETTINGS: 'devtracer_settings_v2',
+  THEME: 'devtrace_theme_v1'
 };
 
-const VALID_HUD_TABS = new Set(['subdomains', 'inspector']);
+const VALID_VIEWS = new Set(['inspector', 'domains', 'source', 'api', 'vault', 'history']);
 
 const state = {
-  hudTab: 'subdomains',
+  view: 'inspector',
   mode: 'website',
   serverAvailable: false,
   scanning: false,
@@ -28,8 +31,12 @@ const state = {
   selectedArtifactId: null,
   codeSearch: '',
   attachedFiles: [],
-  history: []
+  history: [],
+  historySearch: '',
+  vaultCredentials: []
 };
+
+let controllers = {};
 
 // ===================== SAFETY & FORMATTERS =====================
 
@@ -66,6 +73,7 @@ function highlightHostInSnippet(snippet, host) {
 
 function showToast(msg) {
   const el = document.getElementById('toast');
+  if (!el) return;
   el.textContent = msg;
   el.classList.remove('hidden');
   clearTimeout(showToast._timer);
@@ -97,72 +105,122 @@ function loadSettings() {
     if (saved.workerUrl) document.getElementById('optWorkerUrl').value = saved.workerUrl;
     if (typeof saved.probeMeta === 'boolean') document.getElementById('optProbeMeta').checked = saved.probeMeta;
   } catch {}
-  try {
-    const tok = sessionStorage.getItem(STORAGE_KEYS.GH_TOKEN) || '';
-    if (tok) document.getElementById('optGithubToken').value = tok;
-  } catch {}
 }
 
 function saveSettings() {
   const settings = {
-    maxBundles: Number(document.getElementById('optMaxBundles').value) || 8,
-    transport: document.getElementById('optTransport').value || 'auto',
-    workerUrl: document.getElementById('optWorkerUrl').value.trim(),
-    probeMeta: document.getElementById('optProbeMeta').checked
+    maxBundles: Number(document.getElementById('optMaxBundles')?.value) || 4,
+    transport: document.getElementById('optTransport')?.value || 'auto',
+    workerUrl: document.getElementById('optWorkerUrl')?.value?.trim() || '',
+    probeMeta: document.getElementById('optProbeMeta')?.checked ?? true,
+    githubVaultCredId: document.getElementById('optGithubVaultCred')?.value || ''
   };
   try {
-    localStorage.setItem(STORAGE_KEYS.SETTINGS, JSON.stringify(settings));
-    const tok = document.getElementById('optGithubToken').value.trim();
-    if (tok) sessionStorage.setItem(STORAGE_KEYS.GH_TOKEN, tok);
-    else sessionStorage.removeItem(STORAGE_KEYS.GH_TOKEN);
+    localStorage.setItem(
+      STORAGE_KEYS.SETTINGS,
+      JSON.stringify({
+        maxBundles: settings.maxBundles,
+        transport: settings.transport,
+        workerUrl: settings.workerUrl,
+        probeMeta: settings.probeMeta
+      })
+    );
   } catch {}
-  return { ...settings, githubToken: document.getElementById('optGithubToken').value.trim() };
+  return settings;
 }
 
 function loadHistory() {
   try {
-    const list = JSON.parse(localStorage.getItem(STORAGE_KEYS.HISTORY) || '[]');
+    const raw = localStorage.getItem(STORAGE_KEYS.HISTORY) || localStorage.getItem(STORAGE_KEYS.LEGACY_HISTORY) || '[]';
+    const list = JSON.parse(raw);
     if (Array.isArray(list)) state.history = list;
   } catch {
     state.history = [];
   }
-  updateHistoryBadge();
+  updateSidebarBadges();
+}
+
+function persistHistory() {
+  try {
+    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(state.history));
+  } catch {
+    state.history = state.history.slice(0, 4);
+    try { localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(state.history)); } catch {}
+  }
+  updateSidebarBadges();
+  renderHistoryView();
 }
 
 function pushHistory(report) {
-  // Store lightweight report snapshot (trim huge artifact contents to keep localStorage fast)
   const compact = {
     ...report,
     artifacts: (report.artifacts || []).map((a) => ({
       ...a,
-      content: (a.content || '').slice(0, 12000)
+      content: (a.content || '').slice(0, 10000)
     }))
   };
-  state.history = [compact, ...state.history.filter((h) => h.target !== report.target || h.mode !== report.mode)].slice(0, 12);
-  try {
-    localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(state.history));
-  } catch {
-    // If quota exceeded, keep only latest 4
-    state.history = state.history.slice(0, 4);
-    try { localStorage.setItem(STORAGE_KEYS.HISTORY, JSON.stringify(state.history)); } catch {}
+  state.history = [compact, ...state.history.filter((h) => h.target !== report.target || h.mode !== report.mode)].slice(0, 15);
+  persistHistory();
+}
+
+function updateSidebarBadges() {
+  const hEl = document.getElementById('historyCount');
+  if (hEl) hEl.textContent = String(state.history.length);
+
+  const vEl = document.getElementById('sidebarVaultBadge');
+  if (vEl) {
+    const activeCreds = state.vaultCredentials.filter((c) => c.status === 'active').length;
+    vEl.textContent = String(activeCreds);
   }
-  updateHistoryBadge();
+
+  const sEl = document.getElementById('sidebarSourceBadge');
+  if (sEl) {
+    const count = state.report?.sourceIntel
+      ? (state.report.sourceIntel.counts.apiEndpoints + state.report.sourceIntel.counts.frameworkConfigs + state.report.sourceIntel.counts.configReferences)
+      : 0;
+    sEl.textContent = String(count);
+  }
 }
 
-function updateHistoryBadge() {
-  document.getElementById('historyCount').textContent = String(state.history.length);
+function populateGitHubVaultSelect() {
+  const sel = document.getElementById('optGithubVaultCred');
+  if (!sel) return;
+  const prev = sel.value;
+  const eligible = state.vaultCredentials.filter((c) => c.status === 'active' && (c.type === 'github_pat' || c.type === 'bearer_token'));
+  sel.innerHTML = `<option value="">Public GitHub API (No Auth)</option>` +
+    eligible.map((c) => `<option value="${esc(c.id)}">🔒 ${esc(c.name)} (${esc(c.maskedPreview)})</option>`).join('');
+  if (eligible.some((c) => c.id === prev)) sel.value = prev;
+  sel.disabled = !state.serverAvailable;
 }
 
-// ===================== STATUS & MODE =====================
+// ===================== LIVE PROGRESS & STATUS =====================
+
+function setScanProgress(active, label = '', pct = 0) {
+  const wrap = document.getElementById('scanProgressWrap');
+  const bar = document.getElementById('scanProgressBar');
+  const text = document.getElementById('scanProgressText');
+  const pctEl = document.getElementById('scanProgressPct');
+  if (!wrap) return;
+  if (!active) {
+    wrap.classList.add('hidden');
+    return;
+  }
+  wrap.classList.remove('hidden');
+  const clamped = Math.max(8, Math.min(100, Math.round(pct)));
+  if (bar) bar.style.width = `${clamped}%`;
+  if (text) text.textContent = label || 'Inspecting target…';
+  if (pctEl) pctEl.textContent = `${clamped}%`;
+}
 
 function setStatus(type, message) {
   const banner = document.getElementById('statusBanner');
+  if (!banner) return;
   if (!type) {
-    banner.className = 'status-banner hidden';
+    banner.className = 'status-banner glass-surface full-width hidden';
     banner.innerHTML = '';
     return;
   }
-  banner.className = `status-banner ${type}`;
+  banner.className = `status-banner glass-surface full-width ${type}`;
   if (type === 'loading') {
     banner.innerHTML = `<span class="spinner" aria-hidden="true"></span><span>${esc(message)}</span>`;
   } else {
@@ -184,16 +242,26 @@ function setMode(mode) {
 
 function setScanningUI(busy) {
   state.scanning = busy;
-  document.getElementById('websiteSubmitBtn').disabled = busy;
-  document.getElementById('githubSubmitBtn').disabled = busy;
+  const ids = ['websiteSubmitBtn', 'githubSubmitBtn', 'quickScanBtn'];
+  ids.forEach((id) => {
+    const el = document.getElementById(id);
+    if (el) el.disabled = busy;
+  });
 }
 
 // ===================== SCAN EXECUTION =====================
 
+function syncDependentViews() {
+  updateSidebarBadges();
+  controllers.sourceAnalyzer?.render();
+  controllers.apiInspector?.render();
+}
+
 async function runScan(fn, { preserveTabOnFinish = false } = {}) {
   if (state.scanning) return;
   setScanningUI(true);
-  setStatus('loading', 'Initializing fast scan…');
+  setScanProgress(true, 'Initializing live inspection…', 15);
+  setStatus('loading', 'Initializing live inspection…');
   try {
     const report = await fn();
     state.report = report;
@@ -209,9 +277,13 @@ async function runScan(fn, { preserveTabOnFinish = false } = {}) {
       state.selectedArtifactId = report.artifacts?.[0]?.id || null;
     }
     pushHistory(report);
+    setScanProgress(true, 'Inspection complete', 100);
+    setTimeout(() => setScanProgress(false), 450);
     setStatus(null, '');
     renderWorkspace();
+    syncDependentViews();
   } catch (err) {
+    setScanProgress(false);
     setStatus('error', err?.message || 'Scan failed.');
   } finally {
     setScanningUI(false);
@@ -221,6 +293,7 @@ async function runScan(fn, { preserveTabOnFinish = false } = {}) {
 async function handleWebsiteScan(rawUrl) {
   const opts = saveSettings();
   let showedPartial = false;
+  let pct = 18;
   await runScan(
     () =>
       scanWebsiteUrl(rawUrl, {
@@ -229,7 +302,11 @@ async function handleWebsiteScan(rawUrl) {
         maxBundles: opts.maxBundles,
         probeMeta: opts.probeMeta,
         customWorkerUrl: opts.workerUrl,
-        onProgress: (p) => setStatus('loading', p.label),
+        onProgress: (p) => {
+          pct = Math.min(88, pct + 14);
+          setScanProgress(true, p.label, pct);
+          setStatus('loading', p.label);
+        },
         onPartialReport: (partial, label) => {
           showedPartial = true;
           state.report = partial;
@@ -240,8 +317,10 @@ async function handleWebsiteScan(rawUrl) {
           state.domainSearch = '';
           state.codeSearch = '';
           state.selectedArtifactId = partial.artifacts?.[0]?.id || null;
+          setScanProgress(true, label, 65);
           setStatus('loading', label);
           renderWorkspace();
+          syncDependentViews();
         }
       }),
     { preserveTabOnFinish: true }
@@ -253,13 +332,26 @@ async function handleWebsiteScan(rawUrl) {
 
 async function handleGitHubScan(rawRepo) {
   const opts = saveSettings();
-  await runScan(() =>
-    scanGitHub(rawRepo, {
-      token: opts.githubToken,
+  await runScan(async () => {
+    if (state.serverAvailable && opts.githubVaultCredId) {
+      setScanProgress(true, `Scanning GitHub repo via encrypted Vault credential…`, 45);
+      const res = await fetch('./api/github-scan', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ repo: rawRepo, credentialId: opts.githubVaultCredId, maxFiles: 12 })
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || `GitHub scan failed (${res.status})`);
+      return data;
+    }
+    return scanGitHub(rawRepo, {
       maxFiles: 12,
-      onProgress: (p) => setStatus('loading', p.label)
-    })
-  );
+      onProgress: (p) => {
+        setScanProgress(true, p.label, 55);
+        setStatus('loading', p.label);
+      }
+    });
+  });
 }
 
 function handleSampleScan() {
@@ -270,15 +362,17 @@ function handleSampleScan() {
   pushHistory(report);
   setStatus(null, '');
   renderWorkspace();
-  showToast('Loaded multi-environment demo site');
+  syncDependentViews();
+  showToast('Loaded multi-environment demo app');
 }
 
-// ===================== WORKSPACE RENDERING =====================
+// ===================== WEBSITE INSPECTOR RENDERING =====================
 
 function renderWorkspace() {
   const report = state.report;
   const empty = document.getElementById('emptyState');
   const ws = document.getElementById('resultsWorkspace');
+  if (!empty || !ws) return;
 
   if (!report) {
     empty.classList.remove('hidden');
@@ -315,7 +409,7 @@ function renderReportBanner(report) {
     local: 'Client-Side Local'
   };
 
-  const targetHref = safeHref(report.targetUrl || (report.meta?.repoUrl || ''));
+  const targetHref = safeHref(report.targetUrl || report.meta?.repoUrl || '');
   const targetTitleHtml = targetHref
     ? `<a href="${esc(targetHref)}" target="_blank" rel="noopener noreferrer" style="color:inherit;text-decoration:none;"><h2>${esc(report.target)}</h2></a>`
     : `<h2>${esc(report.target)}</h2>`;
@@ -364,13 +458,13 @@ function renderKpiStrip(report) {
       <div class="kpi-value cyan">${c.totalDomains}</div>
       <div class="kpi-sub">${c.apexDomains} apex · ${c.firstParty} first-party</div>
     </button>
-    <button type="button" class="kpi-card glass-surface" data-jump-tab="domains" data-jump-filter="api">
-      <div class="kpi-label">API &amp; Service Hosts</div>
-      <div class="kpi-value green">${c.apiDomains}</div>
-      <div class="kpi-sub">${c.cdnDomains} CDN · ${c.thirdParty} SaaS</div>
+    <button type="button" class="kpi-card glass-surface" data-jump-view="source">
+      <div class="kpi-label">Referenced APIs</div>
+      <div class="kpi-value green">${c.apiEndpoints ?? report.sourceIntel?.counts?.apiEndpoints ?? 0}</div>
+      <div class="kpi-sub">${c.frameworkConfigs ?? 0} configs · ${c.configReferences ?? 0} safe refs</div>
     </button>
     <button type="button" class="kpi-card glass-surface" data-jump-tab="stack">
-      <div class="kpi-label">Build Stack</div>
+      <div class="kpi-label">Tech Stack</div>
       <div class="kpi-value violet">${c.technologies}</div>
       <div class="kpi-sub">${esc(topFrameworks)}</div>
     </button>
@@ -388,12 +482,16 @@ function renderKpiStrip(report) {
       renderWorkspace();
     });
   });
+
+  document.querySelectorAll('[data-jump-view]').forEach((card) => {
+    card.addEventListener('click', () => setView(card.dataset.jumpView));
+  });
 }
 
 function renderActiveTab() {
   const stage = document.getElementById('tabStage');
   const r = state.report;
-  if (!r) return;
+  if (!r || !stage) return;
 
   if (state.activeTab === 'overview') renderOverviewTab(stage, r);
   else if (state.activeTab === 'dev') renderDevTab(stage, r);
@@ -401,8 +499,6 @@ function renderActiveTab() {
   else if (state.activeTab === 'stack') renderStackTab(stage, r);
   else if (state.activeTab === 'code') renderCodeTab(stage, r);
 }
-
-// --------------------- TAB 1: OVERVIEW ---------------------
 
 function renderDevItemCard(d) {
   const firstEv = d.evidence?.[0];
@@ -472,16 +568,17 @@ function renderOverviewTab(stage, r) {
               </div>`
           }
 
-          ${r.envHints.length > 0 ? `
+          ${r.sourceIntel?.apiEndpoints?.length > 0 ? `
             <div style="margin-top:18px;">
-              <div class="drawer-section">
-                <h4>Environment Config Variables Found (${r.envHints.length})</h4>
+              <div class="drawer-section" style="display:flex;justify-content:space-between;align-items:center;">
+                <h4>Publicly Referenced API Endpoints (${r.sourceIntel.apiEndpoints.length})</h4>
+                <button type="button" class="btn btn-glass btn-xs" id="ovOpenSourceIntel">Source Analyzer →</button>
               </div>
               <div class="url-list">
-                ${r.envHints.slice(0, 6).map((e) => `
+                ${r.sourceIntel.apiEndpoints.slice(0, 5).map((ep) => `
                   <div class="url-row">
-                    <span style="color:var(--accent-amber);font-weight:700;">${esc(e.name)}</span>
-                    <span style="color:var(--text-secondary);overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${esc(e.value)}</span>
+                    <span><span class="badge badge-api">${esc(ep.method)}</span> ${esc(ep.path || ep.url)}</span>
+                    <span class="muted-text">${esc(ep.kind)}</span>
                   </div>
                 `).join('')}
               </div>
@@ -529,11 +626,10 @@ function renderOverviewTab(stage, r) {
     state.activeTab = 'stack';
     renderWorkspace();
   });
+  document.getElementById('ovOpenSourceIntel')?.addEventListener('click', () => setView('source'));
 
   bindInspectTriggers(stage);
 }
-
-// --------------------- TAB 2: DEV & PREVIEW SITES ---------------------
 
 function renderDevTab(stage, r) {
   const filters = [
@@ -573,24 +669,6 @@ function renderDevTab(stage, r) {
         }
       </div>
     </div>
-
-    ${r.sourceMaps.length > 0 ? `
-      <div class="panel">
-        <div class="panel-header">
-          <h3 class="panel-title">Exposed Source Map Directives (${r.sourceMaps.length})</h3>
-        </div>
-        <div class="panel-body">
-          <div class="url-list">
-            ${r.sourceMaps.map((sm) => `
-              <div class="url-row">
-                <span>${esc(sm.ref)}</span>
-                <span class="muted-text">${esc(sm.artifact)} · line ${sm.line}</span>
-              </div>
-            `).join('')}
-          </div>
-        </div>
-      </div>
-    ` : ''}
   `;
 
   stage.querySelectorAll('[data-dev-filter]').forEach((btn) => {
@@ -610,8 +688,6 @@ function renderDevTab(stage, r) {
 
   bindInspectTriggers(stage);
 }
-
-// --------------------- TAB 3: ALL DOMAINS ---------------------
 
 function renderDomainsTab(stage, r) {
   const cats = [
@@ -706,7 +782,7 @@ function renderHostsTable(list) {
           ${list.map((d) => `
             <tr data-inspect-host="${esc(d.host)}">
               <td class="mono" style="font-weight:700;">
-                ${esc(d.host)}${d.ports?.length ? `<span style="color:var(--accent-amber);">:${esc(d.ports[0])}</span>` : ''}
+                ${esc(d.host)}${d.ports?.length ? `<span style="color:var(--amber);">:${esc(d.ports[0])}</span>` : ''}
                 ${d.isFirstParty ? ' <span class="badge badge-first-party">1P</span>' : ''}
               </td>
               <td><span class="badge badge-${esc(d.isDevSurface ? d.envTag : d.category)}">${esc(d.isDevSurface ? d.envTag : d.category)}</span></td>
@@ -754,8 +830,6 @@ function renderApexGroupedView(r, filtered) {
     </div>
   `;
 }
-
-// --------------------- TAB 4: BUILD STACK ---------------------
 
 function renderStackTab(stage, r) {
   const cats = Object.entries(r.stack.byCategory || {});
@@ -808,7 +882,7 @@ function renderStackTab(stage, r) {
             <tbody>
               ${r.stack.scripts.map((s) => `
                 <tr>
-                  <td class="mono" style="color:var(--accent-cyan);font-weight:700;">${esc(s.name)}</td>
+                  <td class="mono" style="color:var(--accent-sky);font-weight:700;">${esc(s.name)}</td>
                   <td class="mono">${esc(s.command)}</td>
                   <td class="mono muted-text">${esc(s.artifact)}</td>
                 </tr>
@@ -838,8 +912,6 @@ function renderStackTab(stage, r) {
   `;
 }
 
-// --------------------- TAB 5: SOURCE & HEADERS ---------------------
-
 function renderCodeTab(stage, r) {
   const selected = r.artifacts.find((a) => a.id === state.selectedArtifactId) || r.artifacts[0] || null;
   const headerEntries = Object.entries(r.headers || {});
@@ -856,12 +928,7 @@ function renderCodeTab(stage, r) {
         if (idx !== -1) {
           const start = Math.max(0, idx - 50);
           const end = Math.min(lines[i].length, idx + q.length + 70);
-          matches.push({
-            artifactId: art.id,
-            artifact: art.name,
-            line: i + 1,
-            snippet: lines[i].slice(start, end)
-          });
+          matches.push({ artifactId: art.id, artifact: art.name, line: i + 1, snippet: lines[i].slice(start, end) });
         }
       }
     }
@@ -893,7 +960,7 @@ function renderCodeTab(stage, r) {
     <div class="panel">
       <div class="panel-header">
         <h3 class="panel-title">Search Across All Crawled Source Code</h3>
-        <input type="text" id="globalCodeSearch" class="code-input compact" style="max-width:340px;" placeholder="Search URLs, keys, endpoints, frameworks…" value="${esc(state.codeSearch)}" />
+        <input type="text" id="globalCodeSearch" class="code-input compact" style="max-width:340px;" placeholder="Search URLs, endpoints, frameworks…" value="${esc(state.codeSearch)}" />
       </div>
     </div>
 
@@ -930,7 +997,7 @@ function renderCodeTab(stage, r) {
             <tbody>
               ${headerEntries.map(([k, v]) => `
                 <tr>
-                  <td class="mono" style="color:var(--accent-cyan);white-space:nowrap;">${esc(k)}</td>
+                  <td class="mono" style="color:var(--accent-sky);white-space:nowrap;">${esc(k)}</td>
                   <td class="mono" style="word-break:break-all;">${esc(v)}</td>
                 </tr>
               `).join('')}
@@ -964,7 +1031,85 @@ function renderCodeTab(stage, r) {
   });
 }
 
-// ===================== EVIDENCE DRAWER =====================
+// ===================== SCAN HISTORY VIEW =====================
+
+function renderHistoryView() {
+  const container = document.getElementById('panel-history');
+  if (!container) return;
+  const q = state.historySearch.trim().toLowerCase();
+  const list = state.history.filter(
+    (h) => !q || String(h.target || '').toLowerCase().includes(q) || String(h.architectureSummary || '').toLowerCase().includes(q)
+  );
+
+  container.innerHTML = `
+    <div class="view-header">
+      <div>
+        <span class="section-eyebrow">LOCAL ARCHIVE</span>
+        <h1 class="view-title">Scan History</h1>
+        <p class="view-subtitle">Reopen previous Website Inspector, GitHub Repository, or Source Code scans and export reports at any time.</p>
+      </div>
+      ${state.history.length > 0 ? `<button type="button" class="btn btn-glass btn-xs" id="histClearAllBtn">Clear History</button>` : ''}
+    </div>
+
+    ${list.length === 0
+      ? '<div class="panel glass-surface"><div class="panel-body"><div class="empty-box">No saved scans match. Run any scan from the Quick Scan bar or Website Inspector.</div></div></div>'
+      : `
+        <div class="history-grid">
+          ${list.map((h, idx) => `
+            <article class="history-card glass-surface" data-open-history="${idx}">
+              <div class="dev-item-top">
+                <strong class="mono" style="font-size:13.5px;word-break:break-all;">${esc(h.target)}</strong>
+                <span class="badge badge-api">${esc(h.mode)}</span>
+              </div>
+              <div class="muted-text" style="font-size:12px;">${esc(h.architectureSummary || 'Site inspection report')}</div>
+              <div class="row-gap" style="flex-wrap:wrap;">
+                <span class="badge badge-dev">${h.counts.devSites} dev</span>
+                <span class="badge badge-neutral">${h.counts.totalDomains} hosts</span>
+                <span class="badge badge-first-party">${h.counts.technologies} tech</span>
+                ${h.counts.apiEndpoints != null ? `<span class="badge badge-api">${h.counts.apiEndpoints} APIs</span>` : ''}
+              </div>
+              <div class="dev-item-top" style="margin-top:4px;">
+                <span class="muted-text mono" style="font-size:11px;">${esc(new Date(h.scannedAt).toLocaleString())}</span>
+                <button type="button" class="btn btn-glass btn-xs" data-del-history="${idx}">Remove</button>
+              </div>
+            </article>
+          `).join('')}
+        </div>
+      `
+    }
+  `;
+
+  container.querySelector('#histClearAllBtn')?.addEventListener('click', () => {
+    state.history = [];
+    persistHistory();
+    showToast('Scan history cleared');
+  });
+
+  container.querySelectorAll('[data-open-history]').forEach((card) => {
+    card.addEventListener('click', (e) => {
+      if (e.target.closest('[data-del-history]')) return;
+      const item = list[Number(card.dataset.openHistory)];
+      if (!item) return;
+      state.report = item;
+      state.activeTab = 'overview';
+      state.selectedArtifactId = item.artifacts?.[0]?.id || null;
+      setView('inspector');
+      renderWorkspace();
+      syncDependentViews();
+    });
+  });
+
+  container.querySelectorAll('[data-del-history]').forEach((btn) => {
+    btn.addEventListener('click', (e) => {
+      e.stopPropagation();
+      const targetItem = list[Number(btn.dataset.delHistory)];
+      state.history = state.history.filter((h) => h !== targetItem);
+      persistHistory();
+    });
+  });
+}
+
+// ===================== EVIDENCE DRAWER & WORKER MODAL =====================
 
 function bindInspectTriggers(container) {
   container.querySelectorAll('[data-inspect-host]').forEach((el) => {
@@ -990,7 +1135,7 @@ function openEvidenceDrawer(host) {
 
   const body = document.getElementById('drawerBody');
   body.innerHTML = `
-    <div class="row-gap" style="flex-wrap:wrap;">
+    <div class="row-gap" style="flex-wrap:wrap;margin-bottom:14px;">
       <span class="badge badge-${esc(domain.isDevSurface ? domain.envTag : domain.category)}">${esc(domain.isDevSurface ? domain.envTag : domain.category)}</span>
       ${domain.isFirstParty ? '<span class="badge badge-first-party">First-Party</span>' : '<span class="badge badge-neutral">Third-Party</span>'}
       ${domain.vendor ? `<span class="badge badge-api">${esc(domain.vendor)}</span>` : ''}
@@ -1041,50 +1186,10 @@ function openEvidenceDrawer(host) {
   document.getElementById('evidenceDrawer').classList.remove('hidden');
 }
 
-function closeAllDrawers() {
+function closeEvidenceDrawer() {
   document.getElementById('drawerBackdrop').classList.add('hidden');
   document.getElementById('evidenceDrawer').classList.add('hidden');
-  document.getElementById('historyDrawer').classList.add('hidden');
 }
-
-// ===================== HISTORY DRAWER =====================
-
-function openHistoryDrawer() {
-  const body = document.getElementById('historyBody');
-  if (state.history.length === 0) {
-    body.innerHTML = '<div class="empty-box">No scans saved yet. Run a scan or click a Quick Launch preset.</div>';
-  } else {
-    body.innerHTML = state.history.map((h, idx) => `
-      <div class="history-card" data-load-history="${idx}">
-        <div class="dev-item-top">
-          <strong class="mono">${esc(h.target)}</strong>
-          <span class="badge badge-neutral">${esc(h.mode)}</span>
-        </div>
-        <div class="muted-text mono">${h.counts.devSites} dev · ${h.counts.totalDomains} hosts · ${h.counts.technologies} stack</div>
-        <div class="muted-text" style="font-size:11px;">${esc(new Date(h.scannedAt).toLocaleString())}</div>
-      </div>
-    `).join('');
-
-    body.querySelectorAll('[data-load-history]').forEach((card) => {
-      card.addEventListener('click', () => {
-        const item = state.history[Number(card.dataset.loadHistory)];
-        if (item) {
-          state.report = item;
-          state.activeTab = 'overview';
-          state.selectedArtifactId = item.artifacts?.[0]?.id || null;
-          closeAllDrawers();
-          setHudTab('inspector');
-          renderWorkspace();
-        }
-      });
-    });
-  }
-
-  document.getElementById('drawerBackdrop').classList.remove('hidden');
-  document.getElementById('historyDrawer').classList.remove('hidden');
-}
-
-// ===================== WORKER MODAL =====================
 
 let workerCodeCache = '';
 
@@ -1118,28 +1223,43 @@ async function readDroppedFiles(fileList) {
 
 function updateAttachedFilesUI() {
   const el = document.getElementById('droppedFilesList');
+  if (!el) return;
   if (state.attachedFiles.length === 0) {
-    el.textContent = 'No files attached · Supports HTML, JS, CSS, JSON, YAML, TOML, .HAR';
+    el.textContent = 'No files attached · HTML, JS, CSS, JSON, YAML, TOML, .HAR';
   } else {
     el.textContent = `Attached (${state.attachedFiles.length}): ${state.attachedFiles.map((f) => f.name).join(', ')}`;
   }
 }
 
-// ===================== TOP HUD TABS (2 PRIMARY TABS) =====================
+// ===================== SIDEBAR NAVIGATION =====================
 
-function setHudTab(tabId, { updateHash = true } = {}) {
-  const target = VALID_HUD_TABS.has(tabId) ? tabId : 'subdomains';
-  state.hudTab = target;
+function closeMobileSidebar() {
+  document.getElementById('dashSidebar')?.classList.remove('open');
+  document.getElementById('sidebarBackdrop')?.classList.add('hidden');
+}
 
-  document.querySelectorAll('[data-hud-tab]').forEach((btn) => {
-    const active = btn.dataset.hudTab === target;
+function setView(viewId, { updateHash = true } = {}) {
+  // Map legacy hash "#subdomains" cleanly to Domain Intelligence ("domains")
+  const normalized = viewId === 'subdomains' ? 'domains' : viewId;
+  const target = VALID_VIEWS.has(normalized) ? normalized : 'inspector';
+  state.view = target;
+
+  document.querySelectorAll('[data-nav-view]').forEach((btn) => {
+    const active = btn.dataset.navView === target;
     btn.classList.toggle('active', active);
     btn.setAttribute('aria-selected', String(active));
   });
 
-  document.querySelectorAll('[data-hud-panel]').forEach((panel) => {
-    panel.classList.toggle('hidden', panel.dataset.hudPanel !== target);
+  document.querySelectorAll('[data-view-panel]').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.viewPanel !== target);
   });
+
+  if (target === 'history') renderHistoryView();
+  if (target === 'source') controllers.sourceAnalyzer?.render();
+  if (target === 'api') controllers.apiInspector?.render();
+  if (target === 'vault') controllers.vault?.refresh();
+
+  closeMobileSidebar();
 
   if (updateHash && location.hash !== `#${target}`) {
     history.replaceState(null, '', `#${target}`);
@@ -1153,66 +1273,160 @@ function getRuntimeContext() {
   };
 }
 
-// ===================== BOOTSTRAP & EVENTS =====================
+// ===================== BOOTSTRAP =====================
 
 async function init() {
-  // Restore theme
   const savedTheme = localStorage.getItem(STORAGE_KEYS.THEME) || 'dark';
   document.documentElement.setAttribute('data-theme', savedTheme);
 
   loadSettings();
   loadHistory();
 
-  // Initialize Tab 1 (Subdomains powered by subdomain.app)
-  const subdomains = createSubdomainsController({
-    container: document.getElementById('panel-subdomains'),
+  // Initialize Modular Views
+  controllers.subdomains = createSubdomainsController({
+    container: document.getElementById('panel-domains'),
     getContext: getRuntimeContext,
     copyText,
     showToast,
     onInspectHost: (url) => {
-      setHudTab('inspector');
+      setView('inspector');
       setMode('website');
       const input = document.getElementById('websiteInput');
       if (input) input.value = url;
       handleWebsiteScan(url);
     }
   });
-  subdomains.init();
+  controllers.subdomains.init();
 
-  // Restore initial top HUD tab from URL hash (defaults to Tab 1: Subdomains)
+  controllers.sourceAnalyzer = createSourceAnalyzerController({
+    container: document.getElementById('panel-source'),
+    getReport: () => state.report,
+    copyText,
+    onAnalyzeText: (text) => {
+      try {
+        const report = scanRawArtifacts({ label: 'Source Code Analysis', text, files: [], targetUrl: '' });
+        state.report = report;
+        state.selectedArtifactId = report.artifacts?.[0]?.id || null;
+        pushHistory(report);
+        renderWorkspace();
+        syncDependentViews();
+        showToast('Source code analyzed');
+      } catch (err) {
+        showToast(err.message || 'Paste source code first');
+      }
+    },
+    onTestEndpoint: ({ url, method }) => {
+      setView('api');
+      controllers.apiInspector.prefill({ url, method });
+    }
+  });
+  controllers.sourceAnalyzer.init();
+
+  controllers.apiInspector = createApiInspectorController({
+    container: document.getElementById('panel-api'),
+    getContext: getRuntimeContext,
+    getDiscoveredEndpoints: () => state.report?.sourceIntel?.apiEndpoints || [],
+    getVaultCredentials: () => state.vaultCredentials,
+    copyText,
+    showToast
+  });
+  controllers.apiInspector.init();
+
+  controllers.vault = createVaultController({
+    container: document.getElementById('panel-vault'),
+    getContext: getRuntimeContext,
+    showToast,
+    onCredentialsChanged: (creds) => {
+      state.vaultCredentials = creds || [];
+      updateSidebarBadges();
+      populateGitHubVaultSelect();
+      controllers.apiInspector?.render();
+    },
+    onUseInApiInspector: (cred) => {
+      setView('api');
+      controllers.apiInspector.prefill({
+        url: cred.baseUrl || cred.testUrl || undefined,
+        credentialId: cred.id
+      });
+      showToast(`Attached Vault credential: ${cred.name}`);
+    }
+  });
+
+  renderHistoryView();
+
+  // Restore view from URL hash
   const initialHash = location.hash.replace(/^#/, '').toLowerCase();
-  setHudTab(VALID_HUD_TABS.has(initialHash) ? initialHash : 'subdomains', { updateHash: false });
+  setView(initialHash || 'inspector', { updateHash: false });
 
-  document.querySelectorAll('[data-hud-tab]').forEach((btn) => {
-    btn.addEventListener('click', () => setHudTab(btn.dataset.hudTab));
+  // Sidebar navigation events
+  document.querySelectorAll('[data-nav-view]').forEach((btn) => {
+    btn.addEventListener('click', () => setView(btn.dataset.navView));
   });
 
   window.addEventListener('hashchange', () => {
     const h = location.hash.replace(/^#/, '').toLowerCase();
-    if (VALID_HUD_TABS.has(h)) setHudTab(h, { updateHash: false });
+    if (h) setView(h, { updateHash: false });
   });
 
-  // Check if Node server engine is running
+  // Mobile sidebar toggles
+  document.getElementById('mobileSidebarBtn')?.addEventListener('click', () => {
+    document.getElementById('dashSidebar')?.classList.add('open');
+    document.getElementById('sidebarBackdrop')?.classList.remove('hidden');
+  });
+  document.getElementById('sidebarCloseBtn')?.addEventListener('click', closeMobileSidebar);
+  document.getElementById('sidebarBackdrop')?.addEventListener('click', closeMobileSidebar);
+
+  // Global sidebar filter input
+  document.getElementById('globalSearchInput')?.addEventListener('input', (e) => {
+    const q = e.target.value;
+    if (state.view === 'domains') controllers.subdomains.setSearchFilter(q);
+    else if (state.view === 'source') controllers.sourceAnalyzer.setSearchFilter(q);
+    else if (state.view === 'history') {
+      state.historySearch = q;
+      renderHistoryView();
+    } else if (state.view === 'inspector' && state.report) {
+      state.domainSearch = q;
+      state.devSearch = q;
+      if (state.activeTab === 'dev' || state.activeTab === 'domains') renderActiveTab();
+    }
+  });
+
+  // Top Quick Scan form (accessible from any module)
+  document.getElementById('quickScanForm')?.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const raw = document.getElementById('quickScanInput')?.value?.trim();
+    if (!raw) return;
+    setView('inspector');
+    setMode('website');
+    const siteInput = document.getElementById('websiteInput');
+    if (siteInput) siteInput.value = raw;
+    handleWebsiteScan(raw);
+  });
+
+  // Detect live backend server & vault
   const health = await checkServerAvailability();
   state.serverAvailable = health.available;
   const pill = document.getElementById('engineStatusPill');
   const pillText = document.getElementById('engineStatusText');
   if (health.available) {
-    pill.classList.add('online');
-    pillText.textContent = 'Server Ready';
+    pill?.classList.add('online');
+    if (pillText) pillText.textContent = health.vaultReady ? 'Backend + Vault Ready' : 'Server Ready';
   } else {
-    pill.classList.add('relay');
-    pillText.textContent = 'Browser Live';
+    pill?.classList.add('relay');
+    if (pillText) pillText.textContent = 'Browser Static Mode';
   }
+  populateGitHubVaultSelect();
+  controllers.vault.init();
+  controllers.apiInspector.render();
 
-  // Brand click returns to Tab 1 (Subdomains)
-  document.getElementById('brandReset').addEventListener('click', (e) => {
+  // Brand reset
+  document.getElementById('brandReset')?.addEventListener('click', (e) => {
     e.preventDefault();
-    setHudTab('subdomains');
+    setView('inspector');
   });
 
   // Theme toggle
-  document.getElementById('themeToggle').addEventListener('click', () => {
+  document.getElementById('themeToggle')?.addEventListener('click', () => {
     const cur = document.documentElement.getAttribute('data-theme') || 'dark';
     const next = cur === 'dark' ? 'light' : 'dark';
     document.documentElement.setAttribute('data-theme', next);
@@ -1224,33 +1438,27 @@ async function init() {
     btn.addEventListener('click', () => setMode(btn.dataset.mode));
   });
 
-  // Options toggle
-  const toggleOptions = () => {
+  document.getElementById('optionsToggleBtn')?.addEventListener('click', () => {
     const drawer = document.getElementById('optionsDrawer');
     const isHidden = drawer.classList.toggle('hidden');
     document.getElementById('optionsToggleBtn')?.setAttribute('aria-expanded', String(!isHidden));
-  };
-  document.getElementById('optionsToggleBtn')?.addEventListener('click', toggleOptions);
+  });
 
-  // Save settings on change
-  ['optMaxBundles', 'optTransport', 'optWorkerUrl', 'optGithubToken', 'optProbeMeta'].forEach((id) => {
+  ['optMaxBundles', 'optTransport', 'optWorkerUrl', 'optProbeMeta', 'optGithubVaultCred'].forEach((id) => {
     document.getElementById(id)?.addEventListener('change', saveSettings);
   });
 
-  // Website form submit
-  document.getElementById('websiteForm').addEventListener('submit', (e) => {
+  document.getElementById('websiteForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
     handleWebsiteScan(document.getElementById('websiteInput').value);
   });
 
-  // GitHub form submit
-  document.getElementById('githubForm').addEventListener('submit', (e) => {
+  document.getElementById('githubForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
     handleGitHubScan(document.getElementById('githubInput').value);
   });
 
-  // Source form submit
-  document.getElementById('sourceForm').addEventListener('submit', (e) => {
+  document.getElementById('sourceForm')?.addEventListener('submit', (e) => {
     e.preventDefault();
     const label = document.getElementById('sourceLabelInput').value.trim();
     const text = document.getElementById('sourceTextarea').value;
@@ -1268,41 +1476,42 @@ async function init() {
       pushHistory(report);
       setStatus(null, '');
       renderWorkspace();
+      syncDependentViews();
     } catch (err) {
       setStatus('error', err.message);
     }
   });
 
-  document.getElementById('sourceFileInput').addEventListener('change', (e) => {
+  document.getElementById('sourceFileInput')?.addEventListener('change', (e) => {
     if (e.target.files?.length) readDroppedFiles(e.target.files);
   });
 
-  document.getElementById('clearSourceBtn').addEventListener('click', () => {
+  document.getElementById('clearSourceBtn')?.addEventListener('click', () => {
     document.getElementById('sourceTextarea').value = '';
     document.getElementById('sourceLabelInput').value = '';
     state.attachedFiles = [];
     updateAttachedFilesUI();
   });
 
-  // Drag & drop on raw source box
   const dropZone = document.querySelector('.source-textarea-wrap');
-  ['dragenter', 'dragover'].forEach((evt) => {
-    dropZone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropZone.classList.add('drag-over');
+  if (dropZone) {
+    ['dragenter', 'dragover'].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropZone.classList.add('drag-over');
+      });
     });
-  });
-  ['dragleave', 'drop'].forEach((evt) => {
-    dropZone.addEventListener(evt, (e) => {
-      e.preventDefault();
-      dropZone.classList.remove('drag-over');
+    ['dragleave', 'drop'].forEach((evt) => {
+      dropZone.addEventListener(evt, (e) => {
+        e.preventDefault();
+        dropZone.classList.remove('drag-over');
+      });
     });
-  });
-  dropZone.addEventListener('drop', (e) => {
-    if (e.dataTransfer?.files?.length) readDroppedFiles(e.dataTransfer.files);
-  });
+    dropZone.addEventListener('drop', (e) => {
+      if (e.dataTransfer?.files?.length) readDroppedFiles(e.dataTransfer.files);
+    });
+  }
 
-  // Quick presets
   document.querySelectorAll('[data-preset]').forEach((chip) => {
     chip.addEventListener('click', () => {
       const val = chip.dataset.preset;
@@ -1322,7 +1531,6 @@ async function init() {
     });
   });
 
-  // Result subtabs
   document.querySelectorAll('#resultTabs .subtab').forEach((btn) => {
     btn.addEventListener('click', () => {
       state.activeTab = btn.dataset.tab;
@@ -1330,45 +1538,35 @@ async function init() {
     });
   });
 
-  // Exports
-  document.getElementById('copyDevBtn').addEventListener('click', () => {
+  document.getElementById('copyDevBtn')?.addEventListener('click', () => {
     if (!state.report) return;
     const hosts = state.report.devSites.map((d) => d.host);
     if (hosts.length === 0) return showToast('No dev/staging hosts to copy');
     copyText(hosts.join('\n'), `Copied ${hosts.length} dev/staging hosts`);
   });
-  document.getElementById('exportJsonBtn').addEventListener('click', () => state.report && exportReportJson(state.report));
-  document.getElementById('exportCsvBtn').addEventListener('click', () => state.report && exportDomainsCsv(state.report));
-  document.getElementById('exportMdBtn').addEventListener('click', () => state.report && exportReportMarkdown(state.report));
+  document.getElementById('exportJsonBtn')?.addEventListener('click', () => state.report && exportReportJson(state.report));
+  document.getElementById('exportCsvBtn')?.addEventListener('click', () => state.report && exportDomainsCsv(state.report));
+  document.getElementById('exportMdBtn')?.addEventListener('click', () => state.report && exportReportMarkdown(state.report));
 
-  // Drawers & Modals
-  document.getElementById('drawerCloseBtn').addEventListener('click', closeAllDrawers);
-  document.getElementById('historyCloseBtn').addEventListener('click', closeAllDrawers);
-  document.getElementById('drawerBackdrop').addEventListener('click', closeAllDrawers);
-  document.getElementById('historyBtn').addEventListener('click', openHistoryDrawer);
-  document.getElementById('clearHistoryBtn').addEventListener('click', () => {
-    state.history = [];
-    localStorage.removeItem(STORAGE_KEYS.HISTORY);
-    updateHistoryBadge();
-    openHistoryDrawer();
-  });
+  document.getElementById('drawerCloseBtn')?.addEventListener('click', closeEvidenceDrawer);
+  document.getElementById('drawerBackdrop')?.addEventListener('click', closeEvidenceDrawer);
 
-  document.getElementById('workerGuideBtn').addEventListener('click', openWorkerModal);
-  document.getElementById('workerModalClose').addEventListener('click', () => {
+  document.getElementById('workerGuideBtn')?.addEventListener('click', openWorkerModal);
+  document.getElementById('workerModalClose')?.addEventListener('click', () => {
     document.getElementById('workerModal').classList.add('hidden');
   });
-  document.getElementById('workerModal').addEventListener('click', (e) => {
+  document.getElementById('workerModal')?.addEventListener('click', (e) => {
     if (e.target.id === 'workerModal') e.target.classList.add('hidden');
   });
-  document.getElementById('copyWorkerCodeBtn').addEventListener('click', () => {
+  document.getElementById('copyWorkerCodeBtn')?.addEventListener('click', () => {
     if (workerCodeCache) copyText(workerCodeCache, 'Copied Cloudflare Worker code');
   });
 
-  // Escape closes drawers/modals
   document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
-      closeAllDrawers();
-      document.getElementById('workerModal').classList.add('hidden');
+      closeEvidenceDrawer();
+      closeMobileSidebar();
+      document.getElementById('workerModal')?.classList.add('hidden');
     }
   });
 }

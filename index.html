@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DEVTRACER — made by ★NDX★</title>
-  <meta name="description" content="DEVTRACER made by ★NDX★ — Liquid Glass Subdomain Discovery (subdomain.app) and Fast Site Code & Build Stack Inspector." />
+  <title>DEVTRACER — Advanced Site Inspector &amp; Website Intelligence Platform · made by ★NDX★</title>
+  <meta name="description" content="DEVTRACER made by ★NDX★ — Advanced Site Inspector, Domain Intelligence (subdomain.app + DNS), Source Code Analyzer, API Inspector, and AES-256-GCM Server-Side Credential Vault." />
   <link rel="stylesheet" href="./styles/main.css" />
 </head>
 <body>
@@ -16,248 +16,329 @@
     <div class="liquid-mesh"></div>
   </div>
 
-  <div class="app-shell">
-    <!-- Floating Liquid Glass HUD Dock -->
-    <div class="topbar-wrap">
-      <header class="topbar glass-nav">
-        <div class="topbar-left">
-          <a href="./" class="brand" id="brandReset" title="DEVTRACER — made by ★NDX★">
-            <span class="brand-mark" aria-hidden="true">
-              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
-                <path d="M5 6h14L5 18h14"></path>
-              </svg>
-            </span>
-            <span class="brand-stack">
-              <span class="brand-name">DEVTRACER</span>
-              <span class="ndx-credit">made by <span class="ndx-star" aria-hidden="true">★</span><span class="ndx-name">NDX</span><span class="ndx-star" aria-hidden="true">★</span></span>
-            </span>
-          </a>
-          <span class="engine-pill" id="engineStatusPill" title="Active scan transport">
-            <span class="dot"></span>
-            <span id="engineStatusText">Connecting…</span>
+  <!-- Mobile Sidebar Backdrop -->
+  <div class="sidebar-backdrop hidden" id="sidebarBackdrop"></div>
+
+  <div class="dashboard-shell">
+    <!-- ==================== LEFT LIQUID GLASS SIDEBAR ==================== -->
+    <aside class="dash-sidebar glass-surface" id="dashSidebar" aria-label="DEVTRACER Navigation">
+      <div class="sidebar-head">
+        <a href="./" class="brand" id="brandReset" title="DEVTRACER — made by ★NDX★">
+          <span class="brand-mark" aria-hidden="true">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+              <path d="M5 6h14L5 18h14"></path>
+            </svg>
           </span>
+          <span class="brand-stack">
+            <span class="brand-name">DEVTRACER</span>
+            <span class="ndx-credit">made by <span class="ndx-star" aria-hidden="true">★</span><span class="ndx-name">NDX</span><span class="ndx-star" aria-hidden="true">★</span></span>
+          </span>
+        </a>
+        <button type="button" class="btn btn-glass btn-icon mobile-only" id="sidebarCloseBtn" aria-label="Close sidebar">✕</button>
+      </div>
+
+      <!-- Global Sidebar Search -->
+      <div class="sidebar-search-wrap">
+        <svg class="sidebar-search-icon" width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="11" cy="11" r="7"/><line x1="21" y1="21" x2="16.65" y2="16.65"/></svg>
+        <input type="search" id="globalSearchInput" class="sidebar-search-input" placeholder="Filter active view…" autocomplete="off" />
+      </div>
+
+      <!-- Primary Platform Navigation -->
+      <nav class="sidebar-nav" role="tablist" aria-label="Platform Modules">
+        <div class="sidebar-group-label">INTELLIGENCE</div>
+
+        <button type="button" class="sidebar-item active" data-nav-view="inspector" role="tab" aria-selected="true">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+          <span class="sidebar-item-label">Website Inspector</span>
+        </button>
+
+        <button type="button" class="sidebar-item" data-nav-view="domains" role="tab" aria-selected="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 4 9 14 14 0 0 1-4 9 14 14 0 0 1-4-9 14 14 0 0 1 4-9z"/></svg>
+          <span class="sidebar-item-label">Domain Intelligence</span>
+        </button>
+
+        <button type="button" class="sidebar-item" data-nav-view="source" role="tab" aria-selected="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="8" y1="13" x2="16" y2="13"/><line x1="8" y1="17" x2="13" y2="17"/></svg>
+          <span class="sidebar-item-label">Source Code Analyzer</span>
+          <span class="sidebar-badge" id="sidebarSourceBadge">0</span>
+        </button>
+
+        <div class="sidebar-group-label" style="margin-top:10px;">API &amp; CREDENTIALS</div>
+
+        <button type="button" class="sidebar-item" data-nav-view="api" role="tab" aria-selected="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 16V8a2 2 0 0 0-1-1.73l-7-4a2 2 0 0 0-2 0l-7 4A2 2 0 0 0 3 8v8a2 2 0 0 0 1 1.73l7 4a2 2 0 0 0 2 0l7-4A2 2 0 0 0 21 16z"/><polyline points="3.27 6.96 12 12.01 20.73 6.96"/><line x1="12" y1="22.08" x2="12" y2="12"/></svg>
+          <span class="sidebar-item-label">API Inspector</span>
+        </button>
+
+        <button type="button" class="sidebar-item" data-nav-view="vault" role="tab" aria-selected="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="3" y="11" width="18" height="11" rx="2"/><path d="M7 11V7a5 5 0 0 1 10 0v4"/></svg>
+          <span class="sidebar-item-label">API &amp; Token Vault</span>
+          <span class="sidebar-badge" id="sidebarVaultBadge">0</span>
+        </button>
+
+        <div class="sidebar-group-label" style="margin-top:10px;">WORKSPACE</div>
+
+        <button type="button" class="sidebar-item" data-nav-view="history" role="tab" aria-selected="false">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+          <span class="sidebar-item-label">Scan History</span>
+          <span class="sidebar-badge" id="historyCount">0</span>
+        </button>
+      </nav>
+
+      <!-- Sidebar Footer Status & Controls -->
+      <div class="sidebar-foot">
+        <div class="engine-pill full-pill" id="engineStatusPill" title="Active backend / transport mode">
+          <span class="dot"></span>
+          <span id="engineStatusText">Connecting…</span>
         </div>
-
-        <!-- 2 Primary Liquid Glass Segmented Tabs -->
-        <nav class="hud-tabs" role="tablist" aria-label="Primary Workspace">
-          <button type="button" class="hud-tab active" data-hud-tab="subdomains" role="tab" aria-selected="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 4 9 14 14 0 0 1-4 9 14 14 0 0 1-4-9 14 14 0 0 1 4-9z"/></svg>
-            <span>Subdomains</span>
-          </button>
-          <button type="button" class="hud-tab" data-hud-tab="inspector" role="tab" aria-selected="false">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-            <span>Site Inspector</span>
-          </button>
-        </nav>
-
-        <div class="topbar-right">
-          <button type="button" class="btn btn-glass btn-xs" id="historyBtn" title="Inspector Scan History">
-            <span>History</span>
-            <span class="pill-count" id="historyCount">0</span>
-          </button>
-          <button type="button" class="btn btn-glass btn-xs" id="workerGuideBtn" title="Optional Worker Proxy">
-            <span>Proxy</span>
-          </button>
+        <div class="sidebar-foot-actions">
+          <button type="button" class="btn btn-glass btn-xs" id="workerGuideBtn" title="Optional Cloudflare Worker Proxy">Proxy</button>
           <button type="button" class="btn btn-glass btn-icon" id="themeToggle" title="Toggle Dark / Light Glass" aria-label="Toggle Theme">
-            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
           </button>
+        </div>
+      </div>
+    </aside>
+
+    <!-- ==================== RIGHT MAIN WORKSPACE ==================== -->
+    <div class="dash-content">
+      <!-- Top Quick Scan Bar -->
+      <header class="dash-topbar glass-nav">
+        <button type="button" class="btn btn-glass btn-icon mobile-only" id="mobileSidebarBtn" aria-label="Open navigation">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="3" y1="6" x2="21" y2="6"/><line x1="3" y1="12" x2="21" y2="12"/><line x1="3" y1="18" x2="21" y2="18"/></svg>
+        </button>
+
+        <form class="quick-scan-form" id="quickScanForm">
+          <span class="quick-scan-prefix mono">SCAN</span>
+          <input
+            type="text"
+            id="quickScanInput"
+            class="quick-scan-input mono"
+            placeholder="Quick inspect any URL or GitHub repo (e.g. https://vercel.com or vitejs/vite)…"
+            autocomplete="off"
+            spellcheck="false"
+          />
+          <button type="submit" class="btn btn-primary btn-xs" id="quickScanBtn">Inspect</button>
+        </form>
+
+        <div class="dash-topbar-right">
+          <span class="ndx-credit topbar-credit">made by <span class="ndx-star">★</span><span class="ndx-name">NDX</span><span class="ndx-star">★</span></span>
         </div>
       </header>
-    </div>
 
-    <!-- Single-Tab Active Workspace Container -->
-    <main class="main-wrap">
-      <!-- TAB 1: SUBDOMAINS (powered by subdomain.app) -->
-      <section class="hud-panel" id="panel-subdomains" data-hud-panel="subdomains" aria-label="Subdomains"></section>
-
-      <!-- TAB 2: SITE INSPECTOR -->
-      <section class="hud-panel hidden" id="panel-inspector" data-hud-panel="inspector" aria-label="Site Inspector">
-        <div class="zai-hero">
-          <span class="hero-kicker">
-            <span class="mono">95+ stack signatures · live bundles, headers &amp; GitHub repos</span>
-          </span>
-          <h1 class="zai-title">Site Code &amp; Build Stack Inspector</h1>
-          <p class="zai-subtitle">Inspects live websites, linked JS bundles, DNS records, and GitHub repos to uncover dev/staging domains and 95+ build stack technologies.</p>
+      <!-- Live Scan Progress Strip -->
+      <div class="scan-progress-wrap glass-surface hidden" id="scanProgressWrap" role="status" aria-live="polite">
+        <div class="scan-progress-top">
+          <span class="row-gap"><span class="spinner" aria-hidden="true"></span><span id="scanProgressText">Scanning target…</span></span>
+          <span class="mono muted-text" id="scanProgressPct">20%</span>
         </div>
+        <div class="scan-progress-track">
+          <div class="scan-progress-bar" id="scanProgressBar" style="width:20%"></div>
+        </div>
+      </div>
 
-        <!-- Liquid Glass Composer Card for Site Inspector -->
-        <div class="zai-composer glass-surface">
-          <!-- Website URL Form -->
-          <form class="scan-form" id="websiteForm" data-mode-panel="website">
-            <div class="composer-main-row">
-              <input
-                type="text"
-                id="websiteInput"
-                class="composer-input mono"
-                placeholder="Enter website URL or GitHub repo (e.g. https://vercel.com or vitejs/vite)…"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button type="submit" class="btn btn-primary btn-sm" id="websiteSubmitBtn">Inspect Site</button>
+      <!-- Active View Stage -->
+      <main class="dash-main">
+        <!-- VIEW 1: WEBSITE INSPECTOR -->
+        <section class="hud-panel" id="panel-inspector" data-view-panel="inspector" aria-label="Website Inspector">
+          <div class="view-header">
+            <div>
+              <span class="section-eyebrow">WEBSITE INTELLIGENCE ENGINE · 95+ STACK FINGERPRINTS</span>
+              <h1 class="view-title">Website Inspector</h1>
+              <p class="view-subtitle">Inspect publicly accessible websites (HTML, CSS, JS, headers, DNS) and GitHub repos to identify frameworks, CDNs, analytics, dev/staging hosts, and exportable intelligence reports.</p>
             </div>
-          </form>
+          </div>
 
-          <!-- GitHub Repo Form -->
-          <form class="scan-form hidden" id="githubForm" data-mode-panel="github">
-            <div class="composer-main-row">
-              <input
-                type="text"
-                id="githubInput"
-                class="composer-input mono"
-                placeholder="Enter GitHub repo (e.g. vitejs/vite or https://github.com/owner/repo)…"
-                autocomplete="off"
-                spellcheck="false"
-              />
-              <button type="submit" class="btn btn-primary btn-sm" id="githubSubmitBtn">Scan Repo</button>
-            </div>
-          </form>
-
-          <!-- Raw Source / Drop Form -->
-          <form class="scan-form hidden" id="sourceForm" data-mode-panel="source">
-            <div class="source-textarea-wrap">
-              <div class="source-bar">
-                <input type="text" id="sourceLabelInput" class="code-input compact" placeholder="Origin or label (optional, e.g. https://acme.io)" />
-                <label class="btn btn-glass btn-xs file-btn">
-                  <input type="file" id="sourceFileInput" multiple accept=".html,.htm,.js,.mjs,.cjs,.ts,.tsx,.jsx,.css,.scss,.json,.har,.txt,.yml,.yaml,.toml,.env,.xml,.md" hidden />
-                  Upload Files / HAR
-                </label>
+          <!-- Composer Card -->
+          <div class="zai-composer glass-surface full-width">
+            <form class="scan-form" id="websiteForm" data-mode-panel="website">
+              <div class="composer-main-row">
+                <input
+                  type="text"
+                  id="websiteInput"
+                  class="composer-input mono"
+                  placeholder="Enter website URL or GitHub repo (e.g. https://vercel.com or vitejs/vite)…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button type="submit" class="btn btn-primary btn-sm" id="websiteSubmitBtn">Inspect Site</button>
               </div>
-              <textarea
-                id="sourceTextarea"
-                class="code-textarea"
-                rows="5"
-                placeholder="Paste HTML, JS bundle, package.json, robots.txt, or a DevTools .har export — or drop files here…"
-                spellcheck="false"
-              ></textarea>
-              <div class="drop-footer">
-                <span id="droppedFilesList" class="muted-text">No files attached · HTML, JS, CSS, JSON, YAML, TOML, .HAR</span>
-                <div class="drop-actions">
-                  <button type="button" class="btn btn-glass btn-xs" id="clearSourceBtn">Clear</button>
-                  <button type="submit" class="btn btn-primary btn-xs">Analyze Source</button>
+            </form>
+
+            <form class="scan-form hidden" id="githubForm" data-mode-panel="github">
+              <div class="composer-main-row">
+                <input
+                  type="text"
+                  id="githubInput"
+                  class="composer-input mono"
+                  placeholder="Enter GitHub repo (e.g. vitejs/vite or https://github.com/owner/repo)…"
+                  autocomplete="off"
+                  spellcheck="false"
+                />
+                <button type="submit" class="btn btn-primary btn-sm" id="githubSubmitBtn">Scan Repo</button>
+              </div>
+            </form>
+
+            <form class="scan-form hidden" id="sourceForm" data-mode-panel="source">
+              <div class="source-textarea-wrap">
+                <div class="source-bar">
+                  <input type="text" id="sourceLabelInput" class="code-input compact" placeholder="Origin or label (optional, e.g. https://acme.io)" />
+                  <label class="btn btn-glass btn-xs file-btn">
+                    <input type="file" id="sourceFileInput" multiple accept=".html,.htm,.js,.mjs,.cjs,.ts,.tsx,.jsx,.css,.scss,.json,.har,.txt,.yml,.yaml,.toml,.env,.xml,.md" hidden />
+                    Upload Files / HAR
+                  </label>
+                </div>
+                <textarea
+                  id="sourceTextarea"
+                  class="code-textarea"
+                  rows="5"
+                  placeholder="Paste public HTML, JS bundle, package.json, robots.txt, or a DevTools .har export — or drop files here…"
+                  spellcheck="false"
+                ></textarea>
+                <div class="drop-footer">
+                  <span id="droppedFilesList" class="muted-text">No files attached · HTML, JS, CSS, JSON, YAML, TOML, .HAR</span>
+                  <div class="drop-actions">
+                    <button type="button" class="btn btn-glass btn-xs" id="clearSourceBtn">Clear</button>
+                    <button type="submit" class="btn btn-primary btn-xs">Analyze Source</button>
+                  </div>
                 </div>
               </div>
+            </form>
+
+            <div class="composer-footer-row">
+              <div class="composer-mode-pills" role="tablist" aria-label="Inspector Input Mode">
+                <button type="button" class="mode-tab active" data-mode="website" role="tab" aria-selected="true">Website URL</button>
+                <button type="button" class="mode-tab" data-mode="github" role="tab" aria-selected="false">GitHub Repo</button>
+                <button type="button" class="mode-tab" data-mode="source" role="tab" aria-selected="false">Raw Code / HAR</button>
+              </div>
+              <div class="composer-meta-right">
+                <button type="button" class="btn btn-glass btn-xs" id="optionsToggleBtn" aria-expanded="false">Scan Options</button>
+              </div>
             </div>
-          </form>
 
-          <!-- Integrated Composer Bottom Strip -->
-          <div class="composer-footer-row">
-            <div class="composer-mode-pills" role="tablist" aria-label="Inspector Input Mode">
-              <button type="button" class="mode-tab active" data-mode="website" role="tab" aria-selected="true">Website URL</button>
-              <button type="button" class="mode-tab" data-mode="github" role="tab" aria-selected="false">GitHub Repo</button>
-              <button type="button" class="mode-tab" data-mode="source" role="tab" aria-selected="false">Raw Code / HAR</button>
-            </div>
-            <div class="composer-meta-right">
-              <button type="button" class="btn btn-glass btn-xs" id="optionsToggleBtn" aria-expanded="false">Options</button>
-            </div>
-          </div>
-
-          <!-- Collapsible Options inside Composer -->
-          <div class="options-drawer hidden" id="optionsDrawer">
-            <div class="options-grid">
-              <label class="opt-field">
-                <span>Max JS Bundles</span>
-                <input type="number" id="optMaxBundles" min="0" max="20" value="4" class="code-input compact" />
-              </label>
-              <label class="opt-field">
-                <span>Fetch Transport</span>
-                <select id="optTransport" class="code-input compact">
-                  <option value="auto">Auto (Server → Browser Relay)</option>
-                  <option value="server">Server Crawler Only</option>
-                  <option value="relay">Browser Relay / Worker Only</option>
-                </select>
-              </label>
-              <label class="opt-field">
-                <span>Custom Worker Proxy URL</span>
-                <input type="url" id="optWorkerUrl" class="code-input compact" placeholder="https://devtrace.yourname.workers.dev" />
-              </label>
-              <label class="opt-field">
-                <span>GitHub Token <small>(session only)</small></span>
-                <input type="password" id="optGithubToken" class="code-input compact" placeholder="ghp_… (optional)" autocomplete="off" />
-              </label>
-            </div>
-            <div class="options-checks">
-              <label class="checkbox-label">
-                <input type="checkbox" id="optProbeMeta" checked />
-                <span>Probe <code>robots.txt</code>, <code>sitemap.xml</code>, and <code>.well-known/security.txt</code></span>
-              </label>
-            </div>
-          </div>
-        </div>
-
-        <!-- Quick Presets -->
-        <div class="preset-strip centered">
-          <span class="preset-label">Presets:</span>
-          <button type="button" class="preset-chip" data-preset="sample">Demo: Multi-Env App</button>
-          <button type="button" class="preset-chip" data-preset="url:https://vercel.com">URL: vercel.com</button>
-          <button type="button" class="preset-chip" data-preset="git:vitejs/vite">GitHub: vitejs/vite</button>
-          <button type="button" class="preset-chip" data-preset="git:withastro/astro">GitHub: withastro/astro</button>
-          <button type="button" class="preset-chip" data-preset="git:vercel/next.js">GitHub: vercel/next.js</button>
-        </div>
-
-        <!-- Status Banner -->
-        <div class="status-banner glass-surface hidden" id="statusBanner" role="status" aria-live="polite"></div>
-
-        <!-- Empty Capabilities Cards -->
-        <div class="intro-grid" id="emptyState">
-          <article class="intro-card glass-surface">
-            <div class="intro-icon amber">DEV</div>
-            <h3>Dev, Staging &amp; Preview Radar</h3>
-            <p>Finds <code>dev.*</code>, <code>staging.*</code>, <code>qa.*</code>, <code>*.vercel.app</code>, <code>*.netlify.app</code>, <code>*.pages.dev</code>, tunnels, and localhost ports inside site code and headers.</p>
-          </article>
-          <article class="intro-card glass-surface">
-            <div class="intro-icon">DOM</div>
-            <h3>Clean Domain + DNS Extraction</h3>
-            <p>Extracts full URLs, quoted hosts, WebSockets, CSP endpoints, and live DNS records while stripping JS property noise with exact line evidence.</p>
-          </article>
-          <article class="intro-card glass-surface">
-            <div class="intro-icon">STK</div>
-            <h3>95+ Build Stack Fingerprints</h3>
-            <p>Detects frameworks, bundlers, CSS systems, CMS/builders, edge hosts, package managers, and exact versions straight from DOM markers, bundles, and repos.</p>
-          </article>
-        </div>
-
-        <!-- Inspector Results Workspace -->
-        <div class="workspace hidden" id="resultsWorkspace">
-          <div class="report-banner glass-surface" id="reportBanner"></div>
-          <div class="kpi-strip" id="kpiStrip"></div>
-
-          <div class="subtabs-bar glass-surface">
-            <div class="subtabs" role="tablist" id="resultTabs">
-              <button type="button" class="subtab active" data-tab="overview" role="tab">Overview</button>
-              <button type="button" class="subtab" data-tab="dev" role="tab">
-                Dev &amp; Preview <span class="tab-badge amber" id="tabBadgeDev">0</span>
-              </button>
-              <button type="button" class="subtab" data-tab="domains" role="tab">
-                All Domains <span class="tab-badge" id="tabBadgeDomains">0</span>
-              </button>
-              <button type="button" class="subtab" data-tab="stack" role="tab">
-                Build Stack <span class="tab-badge" id="tabBadgeStack">0</span>
-              </button>
-              <button type="button" class="subtab" data-tab="code" role="tab">
-                Source &amp; Headers <span class="tab-badge" id="tabBadgeCode">0</span>
-              </button>
-            </div>
-            <div class="export-actions">
-              <button type="button" class="btn btn-glass btn-xs" id="copyDevBtn">Copy Dev Hosts</button>
-              <button type="button" class="btn btn-glass btn-xs" id="exportJsonBtn">JSON</button>
-              <button type="button" class="btn btn-glass btn-xs" id="exportCsvBtn">CSV</button>
-              <button type="button" class="btn btn-glass btn-xs" id="exportMdBtn">Markdown</button>
+            <div class="options-drawer hidden" id="optionsDrawer">
+              <div class="options-grid">
+                <label class="opt-field">
+                  <span>Max JS Bundles</span>
+                  <input type="number" id="optMaxBundles" min="0" max="20" value="4" class="code-input compact" />
+                </label>
+                <label class="opt-field">
+                  <span>Fetch Transport</span>
+                  <select id="optTransport" class="code-input compact">
+                    <option value="auto">Auto (Server → Browser Relay)</option>
+                    <option value="server">Server Crawler Only</option>
+                    <option value="relay">Browser Relay / Worker Only</option>
+                  </select>
+                </label>
+                <label class="opt-field">
+                  <span>Custom Worker Proxy URL</span>
+                  <input type="url" id="optWorkerUrl" class="code-input compact" placeholder="https://devtracer.yourname.workers.dev" />
+                </label>
+                <label class="opt-field">
+                  <span>GitHub Vault Credential (Server)</span>
+                  <select id="optGithubVaultCred" class="code-input compact">
+                    <option value="">Public GitHub API (No Auth)</option>
+                  </select>
+                </label>
+              </div>
+              <div class="options-checks">
+                <label class="checkbox-label">
+                  <input type="checkbox" id="optProbeMeta" checked />
+                  <span>Probe <code>robots.txt</code>, <code>sitemap.xml</code>, and <code>.well-known/security.txt</code></span>
+                </label>
+              </div>
             </div>
           </div>
 
-          <div class="tab-stage" id="tabStage"></div>
-        </div>
-      </section>
-    </main>
+          <!-- Quick Launch Presets -->
+          <div class="preset-strip">
+            <span class="preset-label">Quick Inspect:</span>
+            <button type="button" class="preset-chip" data-preset="sample">Demo: Multi-Env App</button>
+            <button type="button" class="preset-chip" data-preset="url:https://vercel.com">vercel.com</button>
+            <button type="button" class="preset-chip" data-preset="url:https://github.com">github.com</button>
+            <button type="button" class="preset-chip" data-preset="git:vitejs/vite">GitHub: vitejs/vite</button>
+            <button type="button" class="preset-chip" data-preset="git:withastro/astro">GitHub: withastro/astro</button>
+          </div>
 
-    <!-- Subtle Liquid Glass Signature Footer -->
-    <footer class="hud-footer">
-      <div class="hud-footer-pill glass-surface">
-        <span class="brand-name-sm">DEVTRACER</span>
-        <span class="footer-sep">·</span>
-        <span class="ndx-credit-lg">made by <span class="ndx-star">★</span><span class="ndx-name">NDX</span><span class="ndx-star">★</span></span>
-      </div>
-    </footer>
+          <div class="status-banner glass-surface full-width hidden" id="statusBanner" role="status" aria-live="polite"></div>
+
+          <!-- Empty State Feature Cards -->
+          <div class="intro-grid" id="emptyState">
+            <article class="intro-card glass-surface">
+              <div class="intro-icon amber">DEV</div>
+              <h3>Dev, Staging &amp; Preview Radar</h3>
+              <p>Identifies <code>dev.*</code>, <code>staging.*</code>, <code>beta.*</code>, <code>preview.*</code>, <code>*.vercel.app</code>, <code>*.pages.dev</code>, and non-prod references inside site code and headers.</p>
+            </article>
+            <article class="intro-card glass-surface">
+              <div class="intro-icon">STK</div>
+              <h3>95+ Technology &amp; CDN Fingerprints</h3>
+              <p>Detects frameworks, bundlers, CSS systems, hosting providers, CDNs, analytics, and exact versions straight from DOM, headers, JS bundles, and GitHub repos.</p>
+            </article>
+            <article class="intro-card glass-surface">
+              <div class="intro-icon">SRC</div>
+              <h3>Source Intel &amp; Safe Exports</h3>
+              <p>Extracts publicly referenced API endpoints, framework configs, and redacted config references — exportable to JSON, CSV, and Markdown reports.</p>
+            </article>
+          </div>
+
+          <!-- Live Results Workspace -->
+          <div class="workspace hidden" id="resultsWorkspace">
+            <div class="report-banner glass-surface" id="reportBanner"></div>
+            <div class="kpi-strip" id="kpiStrip"></div>
+
+            <div class="subtabs-bar glass-surface">
+              <div class="subtabs" role="tablist" id="resultTabs">
+                <button type="button" class="subtab active" data-tab="overview" role="tab">Overview</button>
+                <button type="button" class="subtab" data-tab="dev" role="tab">
+                  Dev &amp; Preview <span class="tab-badge amber" id="tabBadgeDev">0</span>
+                </button>
+                <button type="button" class="subtab" data-tab="domains" role="tab">
+                  All Domains <span class="tab-badge" id="tabBadgeDomains">0</span>
+                </button>
+                <button type="button" class="subtab" data-tab="stack" role="tab">
+                  Tech Stack <span class="tab-badge" id="tabBadgeStack">0</span>
+                </button>
+                <button type="button" class="subtab" data-tab="code" role="tab">
+                  Source &amp; Headers <span class="tab-badge" id="tabBadgeCode">0</span>
+                </button>
+              </div>
+              <div class="export-actions">
+                <button type="button" class="btn btn-glass btn-xs" id="copyDevBtn">Copy Dev Hosts</button>
+                <button type="button" class="btn btn-glass btn-xs" id="exportJsonBtn">JSON</button>
+                <button type="button" class="btn btn-glass btn-xs" id="exportCsvBtn">CSV</button>
+                <button type="button" class="btn btn-glass btn-xs" id="exportMdBtn">Markdown</button>
+              </div>
+            </div>
+
+            <div class="tab-stage" id="tabStage"></div>
+          </div>
+        </section>
+
+        <!-- VIEW 2: DOMAIN INTELLIGENCE -->
+        <section class="hud-panel hidden" id="panel-domains" data-view-panel="domains" aria-label="Domain Intelligence"></section>
+
+        <!-- VIEW 3: SOURCE CODE ANALYZER -->
+        <section class="hud-panel hidden" id="panel-source" data-view-panel="source" aria-label="Source Code Analyzer"></section>
+
+        <!-- VIEW 4: API INSPECTOR -->
+        <section class="hud-panel hidden" id="panel-api" data-view-panel="api" aria-label="API Inspector"></section>
+
+        <!-- VIEW 5: API & TOKEN VAULT -->
+        <section class="hud-panel hidden" id="panel-vault" data-view-panel="vault" aria-label="API & Token Vault"></section>
+
+        <!-- VIEW 6: SCAN HISTORY -->
+        <section class="hud-panel hidden" id="panel-history" data-view-panel="history" aria-label="Scan History"></section>
+
+        <!-- Signature Footer -->
+        <footer class="hud-footer">
+          <div class="hud-footer-pill glass-surface">
+            <span class="brand-name-sm">DEVTRACER</span>
+            <span class="footer-sep">·</span>
+            <span class="ndx-credit-lg">made by <span class="ndx-star">★</span><span class="ndx-name">NDX</span><span class="ndx-star">★</span></span>
+          </div>
+        </footer>
+      </main>
+    </div>
   </div>
 
   <!-- Slide-Over Evidence Inspector Drawer -->
@@ -273,22 +354,7 @@
     <div class="drawer-body" id="drawerBody"></div>
   </aside>
 
-  <!-- History Drawer -->
-  <aside class="drawer glass-drawer hidden" id="historyDrawer" aria-label="Scan History">
-    <div class="drawer-header">
-      <div>
-        <span class="drawer-eyebrow">LOCAL ARCHIVE</span>
-        <h2 class="drawer-title">Recent Inspector Scans</h2>
-      </div>
-      <div class="row-gap">
-        <button type="button" class="btn btn-glass btn-xs" id="clearHistoryBtn">Clear All</button>
-        <button type="button" class="btn btn-glass btn-icon" id="historyCloseBtn" aria-label="Close history">✕</button>
-      </div>
-    </div>
-    <div class="drawer-body" id="historyBody"></div>
-  </aside>
-
-  <!-- GitHub Pages & Worker Setup Modal -->
+  <!-- Cloudflare Worker Proxy Setup Modal -->
   <div class="modal hidden" id="workerModal" role="dialog" aria-modal="true" aria-labelledby="workerModalTitle">
     <div class="modal-card glass-drawer">
       <div class="drawer-header">
@@ -299,7 +365,7 @@
         <button type="button" class="btn btn-glass btn-icon" id="workerModalClose" aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
-        <p class="modal-p">Both <strong>Subdomains</strong> (powered by <code>subdomain.app</code>) and <strong>Site Inspector</strong> work directly on GitHub Pages. Optionally deploy <code>worker/cloudflare-worker.js</code> to Cloudflare Workers (free tier) for dedicated zero-rate-limit <code>api.subdomain.app</code> lookups and full raw HTTP response headers from static Pages, then paste the URL under <strong>Site Inspector → Options → Custom Worker Proxy URL</strong>.</p>
+        <p class="modal-p"><strong>DEVTRACER</strong> runs out of the box on both local Node server (<code>npm start</code>) and static GitHub Pages. Optionally deploy <code>worker/cloudflare-worker.js</code> to Cloudflare Workers (free tier) for dedicated zero-rate-limit <code>api.subdomain.app</code> lookups and full HTTP response headers on GitHub Pages, then paste the URL in <strong>Website Inspector → Scan Options</strong>.</p>
         <div class="code-block-header">
           <span>worker/cloudflare-worker.js</span>
           <button type="button" class="btn btn-glass btn-xs" id="copyWorkerCodeBtn">Copy Worker Code</button>

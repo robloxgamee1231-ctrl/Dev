@@ -1,5 +1,6 @@
 import { extractDomainsFromArtifacts } from './domains.js';
 import { detectBuildStack } from './stack.js';
+import { analyzeSourceIntelligence } from './source-intel.js';
 
 function extractPageTitle(artifacts) {
   for (const a of artifacts) {
@@ -68,6 +69,11 @@ export function analyzeScan({
     repoFiles
   });
 
+  const sourceIntel = analyzeSourceIntelligence(normalizedArtifacts, {
+    targetUrl: targetUrl || (mode === 'website' ? target : ''),
+    repoFiles
+  });
+
   const totalBytes = normalizedArtifacts.reduce((acc, a) => acc + a.bytes, 0);
   const title = meta.title || extractPageTitle(normalizedArtifacts);
   const architectureSummary = summarizeArchitecture(stackReport);
@@ -83,6 +89,9 @@ export function analyzeScan({
     technologies: stackReport.technologies.length,
     sourceMaps: domainReport.sourceMaps.length,
     envHints: domainReport.envHints.length,
+    apiEndpoints: sourceIntel.counts.apiEndpoints,
+    frameworkConfigs: sourceIntel.counts.frameworkConfigs,
+    configReferences: sourceIntel.counts.configReferences,
     artifacts: normalizedArtifacts.length,
     totalBytes
   };
@@ -105,6 +114,7 @@ export function analyzeScan({
     apexGroups: domainReport.apexGroups,
     sourceMaps: domainReport.sourceMaps,
     envHints: domainReport.envHints,
+    sourceIntel,
     stack: stackReport,
     artifacts: normalizedArtifacts
   };

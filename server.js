@@ -5,7 +5,9 @@ import dns from 'node:dns/promises';
 import net from 'node:net';
 import { fileURLToPath } from 'node:url';
 import { analyzeScan } from './src/engine/analyzer.js';
+import { scanGitHubRepo } from './src/engine/github.js';
 import { getApexDomain, normalizeHost } from './src/engine/tlds.js';
+import { createCredentialVault } from './src/server/vault.js';
 
 const __filename = fileURLToPath(import.meta.url);
 const __dirname = path.dirname(__filename);
@@ -520,7 +522,129 @@ async function proxyUpstreamJson(targetUrl, { method = 'GET', timeoutMs = 15_000
   return { status: upstream.status, body: parsed };
 }
 
-export function createAppServer({ allowLocalTest = false } = {}) {
+const ALLOWED_INSPECT_METHODS = new Set(['GET', 'POST', 'PUT', 'PATCH', 'DELETE', 'HEAD', 'OPTIONS']);
+const CRED_ID_RE = /^cred_[0-9a-f]{16}$/i;
+
+async function inspectPublicDnsRecords(domain) {
+  const safeCall = async (fn) => {
+    try { return await fn(); } catch { return []; }
+  };
+  const [a, aaaa, cname, mx, ns, txt, soa] = await Promise.all([
+    safeCall(() => dns.resolve4(domain)),
+    safeCall(() => dns.resolve6(domain)),
+    safeCall(() => dns.resolveCname(domain)),
+    safeCall(() => dns.resolveMx(domain)),
+    safeCall(() => dns.resolveNs(domain)),
+    safeCall(() => dns.resolveTxt(domain)),
+    safeCall(() => dns.resolveSoa(domain).then((s) => (s ? [s] : [])))
+  ]);
+  return {
+    domain,
+    records: {
+      A: a,
+      AAAA: aaaa,
+      CNAME: cname,
+      MX: mx.map((m) => `${m.priority} ${m.exchange}`),
+      NS: ns,
+      TXT: txt.map((parts) => (Array.isArray(parts) ? parts.join('') : String(parts))),
+      SOA: soa.map((s) => `${s.nsname} (${s.hostmaster})`)
+    }
+  };
+}
+
+async function performAuthorizedEndpointRequest({
+  url,
+  method = 'GET',
+  headers = {},
+  body = null,
+  credentialId = '',
+  vault,
+  allowLocalTest = false
+}) {
+  let targetUrl = String(url || '').trim();
+  if (!targetUrl) throw Object.assign(new Error('Endpoint URL is required.'), { status: 400, code: 'INVALID_URL' });
+  if (!/^https?:\/\//i.test(targetUrl)) targetUrl = 'https://' + targetUrl;
+
+  const normMethod = String(method || 'GET').toUpperCase();
+  if (!ALLOWED_INSPECT_METHODS.has(normMethod)) {
+    throw Object.assign(new Error(`Unsupported HTTP method: ${normMethod}`), { status: 400 });
+  }
+
+  await assertSafeTargetUrl(targetUrl, { allowLocalTest });
+
+  const outboundHeaders = {
+    'User-Agent': 'DEVTRACER-API-Inspector/1.0',
+    Accept: 'application/json, text/plain, */*'
+  };
+
+  if (headers && typeof headers === 'object') {
+    for (const [k, v] of Object.entries(headers)) {
+      const cleanKey = String(k || '').trim();
+      if (!cleanKey || !/^[A-Za-z0-9-]{2,64}$/.test(cleanKey)) continue;
+      if (/^(?:host|content-length|connection)$/i.test(cleanKey)) continue;
+      outboundHeaders[cleanKey] = String(v ?? '').slice(0, 1024);
+    }
+  }
+
+  let authUsed = null;
+  if (credentialId && vault) {
+    const resolved = await vault.resolveOutboundAuth(credentialId);
+    Object.assign(outboundHeaders, resolved.headers);
+    authUsed = { id: resolved.meta.id, name: resolved.meta.name, headerName: resolved.meta.headerName };
+  }
+
+  let requestBody;
+  if (body != null && body !== '' && normMethod !== 'GET' && normMethod !== 'HEAD') {
+    requestBody = typeof body === 'string' ? body : JSON.stringify(body);
+    if (!Object.keys(outboundHeaders).some((k) => k.toLowerCase() === 'content-type')) {
+      outboundHeaders['Content-Type'] = 'application/json';
+    }
+  }
+
+  const startedAt = Date.now();
+  let upstream;
+  try {
+    upstream = await fetch(targetUrl, {
+      method: normMethod,
+      headers: outboundHeaders,
+      body: requestBody,
+      redirect: 'manual',
+      signal: AbortSignal.timeout(12_000)
+    });
+  } catch (err) {
+    throw Object.assign(
+      new Error(`Endpoint request failed: ${err?.message || 'network unreachable'}`),
+      { status: 502, code: 'NETWORK_RESTRICTED' }
+    );
+  }
+
+  const latencyMs = Math.max(1, Date.now() - startedAt);
+  const respHeaders = {};
+  upstream.headers.forEach((v, k) => {
+    if (k.toLowerCase() === 'set-cookie') return; // Never echo session cookies
+    respHeaders[k.toLowerCase()] = v;
+  });
+
+  const text = normMethod === 'HEAD' ? '' : await readBoundedText(upstream, 250_000);
+  return {
+    ok: upstream.ok,
+    status: upstream.status,
+    statusText: upstream.statusText || '',
+    method: normMethod,
+    url: targetUrl,
+    latencyMs,
+    contentType: respHeaders['content-type'] || '',
+    bytes: text.length,
+    headers: respHeaders,
+    bodyPreview: text.slice(0, 40_000),
+    authUsed
+  };
+}
+
+export function createAppServer({ allowLocalTest = false, vaultDir } = {}) {
+  const vault = createCredentialVault({ vaultDir });
+  const localAllowed = allowLocalTest || process.env.ALLOW_LOCAL_TEST_TARGETS === '1';
+
   return http.createServer(async (req, res) => {
     try {
       const reqUrl = new URL(req.url || '/', 'http://localhost');
@@ -531,6 +655,7 @@ export function createAppServer({ allowLocalTest = false } = {}) {
           ok: true,
           service: 'devtracer',
           transport: 'server',
+          vaultReady: true,
           nodeVersion: process.version
         });
       }
@@ -538,25 +663,154 @@ export function createAppServer({ allowLocalTest = false } = {}) {
       if (pathname === '/api/scan' && req.method === 'POST') {
         const body = await readJsonBody(req);
         const report = await performServerWebsiteScan(body.url, {
-          maxBundles: body.maxBundles ?? 8,
+          maxBundles: body.maxBundles ?? 6,
           probeMeta: body.probeMeta !== false,
-          allowLocalTest: allowLocalTest || process.env.ALLOW_LOCAL_TEST_TARGETS === '1'
+          allowLocalTest: localAllowed
         });
         return sendJson(res, 200, report);
       }
 
-      // Proxy: Subdomain API (https://api.subdomain.app/v1/query?domain=...)
+      // Authorized GitHub Repo Scan (optionally uses encrypted Vault PAT server-side!)
+      if (pathname === '/api/github-scan' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        let token = '';
+        if (body.credentialId && CRED_ID_RE.test(String(body.credentialId))) {
+          const auth = await vault.resolveOutboundAuth(String(body.credentialId));
+          const authVal = Object.values(auth.headers)[0] || '';
+          token = authVal.replace(/^Bearer\s+/i, '').trim();
+        }
+        const report = await scanGitHubRepo(body.repo, { token, maxFiles: body.maxFiles ?? 12 });
+        return sendJson(res, 200, report);
+      }
+
+      // Live Public DNS Records Inspector
+      if (pathname === '/api/dns' && req.method === 'GET') {
+        let domain = String(reqUrl.searchParams.get('domain') || '').trim().toLowerCase();
+        domain = domain.replace(/^https?:\/\//i, '').split(/[/?#]/)[0].split(':')[0];
+        if (!domain || !ROOT_DOMAIN_RE.test(domain)) {
+          return sendJson(res, 400, { error: 'Enter a valid domain like example.com.' });
+        }
+        const dnsData = await inspectPublicDnsRecords(domain);
+        return sendJson(res, 200, dnsData);
+      }
+
+      // Proxy: Subdomain API (primary: api.subdomain.app, fallback: api.domainee.dev)
       if (pathname === '/api/subdomains' && req.method === 'GET') {
         let domain = String(reqUrl.searchParams.get('domain') || '').trim().toLowerCase();
         domain = domain.replace(/^https?:\/\//i, '').split(/[/?#]/)[0].split(':')[0].replace(/^www\./i, '');
         if (!domain || !ROOT_DOMAIN_RE.test(domain)) {
           return sendJson(res, 400, { error: 'Enter a valid domain like example.com.' });
         }
-        const result = await proxyUpstreamJson(
-          `https://api.subdomain.app/v1/query?domain=${encodeURIComponent(domain)}`,
-          { method: 'GET', timeoutMs: 45_000 }
+        try {
+          const result = await proxyUpstreamJson(
+            `https://api.subdomain.app/v1/query?domain=${encodeURIComponent(domain)}`,
+            { method: 'GET', timeoutMs: 35_000 }
+          );
+          if (result.status < 400 && Array.isArray(result.body?.subdomains)) {
+            return sendJson(res, 200, { ...result.body, source: 'subdomain.app' });
+          }
+        } catch {}
+
+        // Seamless server-side fallback to domainee.dev
+        const fallback = await proxyUpstreamJson(
+          `https://api.domainee.dev/v1/tools/subdomain-finder?domain=${encodeURIComponent(domain)}`,
+          { method: 'GET', timeoutMs: 25_000 }
         );
-        return sendJson(res, result.status, result.body ?? {});
+        if (fallback.status < 400 && Array.isArray(fallback.body?.data?.subdomains)) {
+          const rawList = fallback.body.data.subdomains;
+          const hosts = rawList.map((item) => (typeof item === 'string' ? item : item?.host)).filter(Boolean);
+          const addressMap = {};
+          for (const item of rawList) {
+            if (item && typeof item === 'object' && item.host && Array.isArray(item.addresses)) {
+              addressMap[item.host.toLowerCase()] = item.addresses;
+            }
+          }
+          return sendJson(res, 200, {
+            domain,
+            count: hosts.length,
+            total: fallback.body.data.counts?.total ?? hosts.length,
+            subdomains: hosts,
+            addresses: addressMap,
+            source: 'domainee.dev'
+          });
+        }
+        return sendJson(res, 502, { error: 'Subdomain providers temporarily unreachable from server.' });
+      }
+
+      // API Inspector — Authorized Live Endpoint Tester (SSRF-hardened, server-side auth injection)
+      if (pathname === '/api/inspect-endpoint' && req.method === 'POST') {
+        const body = await readJsonBody(req, 131_072);
+        const result = await performAuthorizedEndpointRequest({
+          url: body.url,
+          method: body.method || 'GET',
+          headers: body.headers || {},
+          body: body.body ?? null,
+          credentialId: body.credentialId || '',
+          vault,
+          allowLocalTest: localAllowed
+        });
+        return sendJson(res, 200, result);
+      }
+
+      // Encrypted Credential Vault CRUD & Connection Tester (Secrets NEVER returned!)
+      if (pathname === '/api/credentials' && req.method === 'GET') {
+        return sendJson(res, 200, { encrypted: true, cipher: 'AES-256-GCM', credentials: await vault.list() });
+      }
+
+      if (pathname === '/api/credentials' && req.method === 'POST') {
+        const body = await readJsonBody(req);
+        const created = await vault.create(body);
+        return sendJson(res, 201, { credential: created });
+      }
+
+      const credMatch = pathname.match(/^\/api\/credentials\/([^/]+)$/);
+      if (credMatch) {
+        const id = credMatch[1];
+        if (!CRED_ID_RE.test(id)) return sendJson(res, 400, { error: 'Invalid credential ID.' });
+        if (req.method === 'PUT') {
+          const body = await readJsonBody(req);
+          const updated = await vault.update(id, body);
+          return sendJson(res, 200, { credential: updated });
+        }
+        if (req.method === 'DELETE') {
+          const deleted = await vault.remove(id);
+          return sendJson(res, 200, deleted);
+        }
+      }
+
+      const revokeMatch = pathname.match(/^\/api\/credentials\/([^/]+)\/revoke$/);
+      if (revokeMatch && req.method === 'POST') {
+        const id = revokeMatch[1];
+        if (!CRED_ID_RE.test(id)) return sendJson(res, 400, { error: 'Invalid credential ID.' });
+        const revoked = await vault.revoke(id);
+        return sendJson(res, 200, { credential: revoked });
+      }
+
+      const testMatch = pathname.match(/^\/api\/credentials\/([^/]+)\/test$/);
+      if (testMatch && req.method === 'POST') {
+        const id = testMatch[1];
+        if (!CRED_ID_RE.test(id)) return sendJson(res, 400, { error: 'Invalid credential ID.' });
+        const body = await readJsonBody(req);
+        const auth = await vault.resolveOutboundAuth(id);
+        const testUrl = String(body.testUrl || auth.meta.testUrl || auth.meta.baseUrl || '').trim();
+        if (!testUrl) {
+          return sendJson(res, 400, { error: 'Provide a Test Endpoint URL on this credential to test connectivity.' });
+        }
+        const testRes = await performAuthorizedEndpointRequest({
+          url: testUrl,
+          method: body.method || 'GET',
+          credentialId: id,
+          vault,
+          allowLocalTest: localAllowed
+        });
+        const summary = {
+          ok: testRes.ok,
+          status: testRes.status,
+          latencyMs: testRes.latencyMs,
+          url: testRes.url
+        };
+        const updated = await vault.recordTestResult(id, summary);
+        return sendJson(res, 200, { credential: updated, result: testRes });
       }
 
       if (req.method === 'GET' || req.method === 'HEAD') {

@@ -1,0 +1,316 @@
+<!DOCTYPE html>
+<html lang="en" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>DevTrace — Source Code Domain, Dev Site & Build Stack Inspector</title>
+  <meta name="description" content="Inspect live websites, JS bundles, HTTP headers, and GitHub repositories to uncover dev/staging/preview domains and full build stacks." />
+  <link rel="stylesheet" href="./styles/main.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <!-- Top Header -->
+    <header class="topbar">
+      <div class="topbar-left">
+        <a href="./" class="brand" id="brandReset" title="DevTrace Home">
+          <span class="brand-mark" aria-hidden="true">
+            <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round">
+              <circle cx="12" cy="12" r="9" opacity="0.45"></circle>
+              <circle cx="12" cy="12" r="4.5"></circle>
+              <path d="M12 3v3M21 12h-3M12 21v-3M3 12h3"></path>
+              <circle cx="17.5" cy="6.5" r="2" fill="#f59e0b" stroke="none"></circle>
+            </svg>
+          </span>
+          <span class="brand-name">DEVTRACE</span>
+          <span class="brand-tag">SOURCE INTEL</span>
+        </a>
+        <span class="engine-pill" id="engineStatusPill" title="Checking scan engine transport">
+          <span class="dot"></span>
+          <span id="engineStatusText">Detecting engine…</span>
+        </span>
+      </div>
+
+      <div class="topbar-right">
+        <button type="button" class="btn btn-ghost btn-sm" id="historyBtn" title="Recent Scans">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><polyline points="12 7 12 12 15 15"/></svg>
+          <span>History</span>
+          <span class="pill-count" id="historyCount">0</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-sm" id="workerGuideBtn" title="GitHub Pages & Cloudflare Worker Setup">
+          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M12 2L2 7l10 5 10-5-10-5z"/><path d="M2 17l10 5 10-5"/><path d="M2 12l10 5 10-5"/></svg>
+          <span>Pages Proxy</span>
+        </button>
+        <button type="button" class="btn btn-ghost btn-icon" id="themeToggle" title="Toggle Dark / Light Theme" aria-label="Toggle Theme">
+          <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" id="themeIcon"><circle cx="12" cy="12" r="5"/><line x1="12" y1="1" x2="12" y2="3"/><line x1="12" y1="21" x2="12" y2="23"/><line x1="4.22" y1="4.22" x2="5.64" y2="5.64"/><line x1="18.36" y1="18.36" x2="19.78" y2="19.78"/><line x1="1" y1="12" x2="3" y2="12"/><line x1="21" y1="12" x2="23" y2="12"/><line x1="4.22" y1="19.78" x2="5.64" y2="18.36"/><line x1="18.36" y1="5.64" x2="19.78" y2="4.22"/></svg>
+        </button>
+      </div>
+    </header>
+
+    <!-- Main Container -->
+    <main class="main-wrap">
+      <!-- Command Deck -->
+      <section class="command-deck" aria-label="Target Scanner">
+        <div class="deck-header">
+          <div>
+            <h1 class="deck-title">Uncover dev environments, embedded domains, and build stacks straight from site code.</h1>
+            <p class="deck-sub">Crawls HTML, JS bundles, stylesheets, HTTP headers, manifests, and GitHub repositories with exact file-and-line proof.</p>
+          </div>
+          <div class="mode-tabs" role="tablist" aria-label="Scan Mode">
+            <button type="button" class="mode-tab active" data-mode="website" role="tab" aria-selected="true">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><line x1="2" y1="12" x2="22" y2="12"/><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"/></svg>
+              Website URL
+            </button>
+            <button type="button" class="mode-tab" data-mode="github" role="tab" aria-selected="false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+              GitHub Repo
+            </button>
+            <button type="button" class="mode-tab" data-mode="source" role="tab" aria-selected="false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+              Raw Code / Files
+            </button>
+          </div>
+        </div>
+
+        <!-- Website URL Form -->
+        <form class="scan-form" id="websiteForm" data-mode-panel="website">
+          <div class="input-group">
+            <span class="input-prefix">URL</span>
+            <input
+              type="text"
+              id="websiteInput"
+              class="code-input"
+              placeholder="https://example.com or github.com"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" class="btn btn-ghost btn-sm" id="optionsToggleBtn" aria-expanded="false">
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9c.26.6.85 1 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+              Options
+            </button>
+            <button type="submit" class="btn btn-primary" id="websiteSubmitBtn">
+              Inspect Site
+            </button>
+          </div>
+        </form>
+
+        <!-- GitHub Repo Form -->
+        <form class="scan-form hidden" id="githubForm" data-mode-panel="github">
+          <div class="input-group">
+            <span class="input-prefix">GIT</span>
+            <input
+              type="text"
+              id="githubInput"
+              class="code-input"
+              placeholder="owner/repo or https://github.com/owner/repo"
+              autocomplete="off"
+              spellcheck="false"
+            />
+            <button type="button" class="btn btn-ghost btn-sm" id="optionsToggleBtnGit">Options</button>
+            <button type="submit" class="btn btn-primary" id="githubSubmitBtn">
+              Scan Repo
+            </button>
+          </div>
+        </form>
+
+        <!-- Raw Source / Drop Form -->
+        <form class="scan-form hidden" id="sourceForm" data-mode-panel="source">
+          <div class="source-grid">
+            <div class="source-textarea-wrap">
+              <div class="source-bar">
+                <input type="text" id="sourceLabelInput" class="code-input compact" placeholder="Label or target origin (optional, e.g. https://acme.io)" />
+                <label class="btn btn-ghost btn-sm file-btn">
+                  <input type="file" id="sourceFileInput" multiple accept=".html,.htm,.js,.mjs,.cjs,.ts,.tsx,.jsx,.css,.scss,.json,.har,.txt,.yml,.yaml,.toml,.env,.xml,.md" hidden />
+                  Upload Files / HAR
+                </label>
+              </div>
+              <textarea
+                id="sourceTextarea"
+                class="code-textarea"
+                rows="6"
+                placeholder="Paste HTML, minified JS bundle, package.json, robots.txt, or a Chrome DevTools .har export — or drag & drop files here…"
+                spellcheck="false"
+              ></textarea>
+              <div class="drop-footer">
+                <span id="droppedFilesList" class="muted-text">No files attached · Supports HTML, JS, CSS, JSON, YAML, TOML, .HAR</span>
+                <div class="drop-actions">
+                  <button type="button" class="btn btn-ghost btn-sm" id="clearSourceBtn">Clear</button>
+                  <button type="submit" class="btn btn-primary btn-sm">Analyze Source</button>
+                </div>
+              </div>
+            </div>
+          </div>
+        </form>
+
+        <!-- Collapsible Engine Options -->
+        <div class="options-drawer hidden" id="optionsDrawer">
+          <div class="options-grid">
+            <label class="opt-field">
+              <span>Max JS Bundles</span>
+              <input type="number" id="optMaxBundles" min="0" max="20" value="8" class="code-input compact" />
+            </label>
+            <label class="opt-field">
+              <span>Fetch Transport</span>
+              <select id="optTransport" class="code-input compact">
+                <option value="auto">Auto (Server → Browser Relay)</option>
+                <option value="server">Server Crawler Only</option>
+                <option value="relay">Browser Relay / Worker Only</option>
+              </select>
+            </label>
+            <label class="opt-field">
+              <span>Custom Worker Proxy URL <small>(for GitHub Pages)</small></span>
+              <input type="url" id="optWorkerUrl" class="code-input compact" placeholder="https://devtrace.yourname.workers.dev" />
+            </label>
+            <label class="opt-field">
+              <span>GitHub Token <small>(session only, 5k req/hr)</small></span>
+              <input type="password" id="optGithubToken" class="code-input compact" placeholder="ghp_… (optional)" autocomplete="off" />
+            </label>
+          </div>
+          <div class="options-checks">
+            <label class="checkbox-label">
+              <input type="checkbox" id="optProbeMeta" checked />
+              <span>Probe <code>robots.txt</code>, <code>sitemap.xml</code>, and <code>.well-known/security.txt</code></span>
+            </label>
+          </div>
+        </div>
+
+        <!-- Quick Presets -->
+        <div class="preset-strip">
+          <span class="preset-label">Quick Launch:</span>
+          <button type="button" class="preset-chip preset-highlight" data-preset="sample">
+            <span class="chip-dot amber"></span>Demo: Multi-Env Prod Bundle
+          </button>
+          <button type="button" class="preset-chip" data-preset="url:https://github.com">
+            <span class="chip-dot cyan"></span>URL: github.com
+          </button>
+          <button type="button" class="preset-chip" data-preset="git:vitejs/vite">
+            <span class="chip-dot green"></span>GitHub: vitejs/vite
+          </button>
+          <button type="button" class="preset-chip" data-preset="git:withastro/astro">
+            <span class="chip-dot violet"></span>GitHub: withastro/astro
+          </button>
+          <button type="button" class="preset-chip" data-preset="git:vercel/next.js">
+            <span class="chip-dot violet"></span>GitHub: vercel/next.js
+          </button>
+        </div>
+
+        <!-- Live Progress / Error Banner -->
+        <div class="status-banner hidden" id="statusBanner" role="status" aria-live="polite"></div>
+      </section>
+
+      <!-- Empty Welcome Capabilities Grid (shown before first scan) -->
+      <section class="intro-grid" id="emptyState">
+        <article class="intro-card">
+          <div class="intro-icon amber">DEV</div>
+          <h3>Dev, Staging &amp; Preview Radar</h3>
+          <p>Hunts through HTML, JS chunks, <code>__NEXT_DATA__</code>, CSP headers, <code>robots.txt</code>, and CI workflows for <code>dev.*</code>, <code>staging.*</code>, <code>qa.*</code>, <code>*.vercel.app</code>, <code>*.netlify.app</code>, <code>*.pages.dev</code>, tunnels, and exposed localhost ports.</p>
+        </article>
+        <article class="intro-card">
+          <div class="intro-icon cyan">DOM</div>
+          <h3>Zero-Noise Domain Extraction</h3>
+          <p>Extracts full URLs, protocol-relative assets, quoted API hosts, and WebSocket endpoints while filtering out JavaScript property chains and file extensions. Groups by host and apex domain with clickable line-level proof.</p>
+        </article>
+        <article class="intro-card">
+          <div class="intro-icon violet">STK</div>
+          <h3>95+ Build Stack Fingerprints</h3>
+          <p>Identifies frameworks, bundlers (Vite, Webpack, Turbopack, Rspack, Rollup), CSS systems, CMSs, edge hosting, package managers, auth/DB SDKs, and exact versions straight from DOM markers, bundles, headers, and repo configs.</p>
+        </article>
+      </section>
+
+      <!-- Results Workspace -->
+      <section class="workspace hidden" id="resultsWorkspace" aria-label="Scan Results">
+        <!-- Report Banner -->
+        <div class="report-banner" id="reportBanner"></div>
+
+        <!-- KPI Strip -->
+        <div class="kpi-strip" id="kpiStrip"></div>
+
+        <!-- Sub Navigation Tabs -->
+        <div class="subtabs-bar">
+          <div class="subtabs" role="tablist" id="resultTabs">
+            <button type="button" class="subtab active" data-tab="overview" role="tab">Overview</button>
+            <button type="button" class="subtab" data-tab="dev" role="tab">
+              Dev &amp; Preview Sites <span class="tab-badge amber" id="tabBadgeDev">0</span>
+            </button>
+            <button type="button" class="subtab" data-tab="domains" role="tab">
+              All Domains <span class="tab-badge" id="tabBadgeDomains">0</span>
+            </button>
+            <button type="button" class="subtab" data-tab="stack" role="tab">
+              Build Stack <span class="tab-badge violet" id="tabBadgeStack">0</span>
+            </button>
+            <button type="button" class="subtab" data-tab="code" role="tab">
+              Source &amp; Headers <span class="tab-badge" id="tabBadgeCode">0</span>
+            </button>
+          </div>
+          <div class="export-actions">
+            <button type="button" class="btn btn-ghost btn-sm" id="copyDevBtn" title="Copy discovered dev/staging/preview domains">Copy Dev Hosts</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="exportJsonBtn">JSON</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="exportCsvBtn">CSV</button>
+            <button type="button" class="btn btn-ghost btn-sm" id="exportMdBtn">Markdown</button>
+          </div>
+        </div>
+
+        <!-- Dynamic Tab Content -->
+        <div class="tab-stage" id="tabStage"></div>
+      </section>
+    </main>
+  </div>
+
+  <!-- Slide-Over Evidence Inspector Drawer -->
+  <div class="drawer-backdrop hidden" id="drawerBackdrop"></div>
+  <aside class="drawer hidden" id="evidenceDrawer" aria-label="Domain Evidence Inspector">
+    <div class="drawer-header">
+      <div>
+        <span class="drawer-eyebrow" id="drawerEyebrow">HOST EVIDENCE</span>
+        <h2 class="drawer-title" id="drawerTitle"></h2>
+      </div>
+      <button type="button" class="btn btn-ghost btn-icon" id="drawerCloseBtn" aria-label="Close drawer">✕</button>
+    </div>
+    <div class="drawer-body" id="drawerBody"></div>
+  </aside>
+
+  <!-- History Modal / Drawer -->
+  <aside class="drawer hidden" id="historyDrawer" aria-label="Scan History">
+    <div class="drawer-header">
+      <div>
+        <span class="drawer-eyebrow">LOCAL ARCHIVE</span>
+        <h2 class="drawer-title">Recent Scans</h2>
+      </div>
+      <div class="row-gap">
+        <button type="button" class="btn btn-ghost btn-sm" id="clearHistoryBtn">Clear All</button>
+        <button type="button" class="btn btn-ghost btn-icon" id="historyCloseBtn" aria-label="Close history">✕</button>
+      </div>
+    </div>
+    <div class="drawer-body" id="historyBody"></div>
+  </aside>
+
+  <!-- GitHub Pages & Worker Setup Modal -->
+  <div class="modal hidden" id="workerModal" role="dialog" aria-modal="true" aria-labelledby="workerModalTitle">
+    <div class="modal-card">
+      <div class="drawer-header">
+        <div>
+          <span class="drawer-eyebrow">GITHUB PAGES DEPLOYMENT</span>
+          <h2 class="drawer-title" id="workerModalTitle">Zero-Build Static Hosting + Optional Proxy Worker</h2>
+        </div>
+        <button type="button" class="btn btn-ghost btn-icon" id="workerModalClose" aria-label="Close">✕</button>
+      </div>
+      <div class="modal-body">
+        <p class="modal-p">DevTrace runs out of the box as a static GitHub Pages site (<code>index.html</code> + ES modules) AND as a full Node.js crawler (<code>npm start</code>).</p>
+        <ul class="modal-list">
+          <li><strong>GitHub Repo Scans</strong> &amp; <strong>Raw Code / HAR</strong> run 100% client-side everywhere — no server required.</li>
+          <li><strong>Live Website Scans</strong> use the Node server when self-hosted, or automatic browser relays on GitHub Pages.</li>
+          <li>For full HTTP response headers (<code>Server</code>, <code>X-Vercel-Id</code>, <code>CSP</code>) and uncapped JS bundle crawling on GitHub Pages, deploy <code>worker/cloudflare-worker.js</code> to Cloudflare Workers (free tier) and paste its URL in <strong>Options → Custom Worker Proxy URL</strong>.</li>
+        </ul>
+        <div class="code-block-header">
+          <span>worker/cloudflare-worker.js</span>
+          <button type="button" class="btn btn-ghost btn-sm" id="copyWorkerCodeBtn">Copy Worker Code</button>
+        </div>
+        <pre class="code-viewer small" id="workerCodePreview">Loading worker/cloudflare-worker.js…</pre>
+      </div>
+    </div>
+  </div>
+
+  <div class="toast hidden" id="toast" role="status" aria-live="polite"></div>
+
+  <script type="module" src="./src/ui/app.js"></script>
+</body>
+</html>

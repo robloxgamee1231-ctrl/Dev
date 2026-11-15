@@ -28,8 +28,8 @@ export function renderTopologySvg(report) {
     {
       id: 'dev',
       title: 'DEV / STAGING / PREVIEW',
-      color: '#f59e0b',
-      bg: 'rgba(245, 158, 11, 0.12)',
+      color: '#fbbf24',
+      bg: 'rgba(251, 191, 36, 0.14)',
       nodes: devNodes,
       anchorX: 165,
       startY: 56,
@@ -39,8 +39,8 @@ export function renderTopologySvg(report) {
     {
       id: 'api',
       title: 'API & BACKEND',
-      color: '#d4d4d4',
-      bg: 'rgba(255, 255, 255, 0.08)',
+      color: '#38bdf8',
+      bg: 'rgba(56, 189, 248, 0.12)',
       nodes: apiNodes,
       anchorX: width - 165,
       startY: 56,
@@ -50,8 +50,8 @@ export function renderTopologySvg(report) {
     {
       id: 'fp',
       title: 'FIRST-PARTY DOMAINS',
-      color: '#22c55e',
-      bg: 'rgba(34, 197, 94, 0.12)',
+      color: '#34d399',
+      bg: 'rgba(52, 211, 153, 0.12)',
       nodes: fpNodes,
       anchorX: 165,
       startY: 256,
@@ -61,8 +61,8 @@ export function renderTopologySvg(report) {
     {
       id: 'infra',
       title: 'CDN & SERVICES',
-      color: '#8a8a8a',
-      bg: 'rgba(255, 255, 255, 0.06)',
+      color: '#a78bfa',
+      bg: 'rgba(167, 139, 250, 0.10)',
       nodes: infraNodes,
       anchorX: width - 165,
       startY: 256,
@@ -119,10 +119,10 @@ export function renderTopologySvg(report) {
       const badge = (node.envTag || cluster.id).toUpperCase().slice(0, 7);
       nodesSvg.push(`
         <g class="topo-node" data-inspect-host="${esc(node.host)}" tabindex="0" role="button" aria-label="Inspect ${esc(node.host)}">
-          <rect x="${boxX}" y="${ny - boxH / 2}" width="${boxW}" height="${boxH}" rx="6" fill="var(--surface-2)" stroke="${cluster.color}" stroke-opacity="0.45" stroke-width="1" />
-          <circle cx="${isLeft ? boxX + 11 : boxX + boxW - 11}" cy="${ny}" r="3.5" fill="${cluster.color}" />
-          <text x="${isLeft ? boxX + 21 : boxX + boxW - 21}" y="${ny + 3.5}" text-anchor="${isLeft ? 'start' : 'end'}" fill="var(--text-primary)" font-size="11" font-family="var(--font-mono)">${esc(truncate(node.host, 25))}</text>
-          <text x="${isLeft ? boxX + boxW - 8 : boxX + 8}" y="${ny + 3}" text-anchor="${isLeft ? 'end' : 'start'}" fill="${cluster.color}" font-size="9" font-weight="700" font-family="var(--font-mono)" opacity="0.85">${esc(badge)}</text>
+          <rect x="${boxX}" y="${ny - boxH / 2}" width="${boxW}" height="${boxH}" rx="12" fill="var(--glass-svg-node)" stroke="${cluster.color}" stroke-opacity="0.48" stroke-width="1" />
+          <circle cx="${isLeft ? boxX + 12 : boxX + boxW - 12}" cy="${ny}" r="3.5" fill="${cluster.color}" />
+          <text x="${isLeft ? boxX + 22 : boxX + boxW - 22}" y="${ny + 3.5}" text-anchor="${isLeft ? 'start' : 'end'}" fill="var(--text-primary)" font-size="11" font-family="var(--font-mono)">${esc(truncate(node.host, 24))}</text>
+          <text x="${isLeft ? boxX + boxW - 10 : boxX + 10}" y="${ny + 3}" text-anchor="${isLeft ? 'end' : 'start'}" fill="${cluster.color}" font-size="9" font-weight="700" font-family="var(--font-mono)" opacity="0.9">${esc(badge)}</text>
         </g>
       `);
     });
@@ -135,14 +135,15 @@ export function renderTopologySvg(report) {
     <svg class="topology-svg" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Domain and environment topology graph">
       <defs>
         <radialGradient id="hubGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.08" />
+          <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.22" />
+          <stop offset="60%" stop-color="#818cf8" stop-opacity="0.08" />
           <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
         </radialGradient>
       </defs>
-      <circle cx="${cx}" cy="${cy}" r="118" fill="url(#hubGlow)" />
+      <circle cx="${cx}" cy="${cy}" r="132" fill="url(#hubGlow)" />
       <g class="topo-edges">${edgesSvg.join('')}</g>
       <g class="topo-hub">
-        <rect x="${cx - 108}" y="${cy - 34}" width="216" height="68" rx="10" fill="var(--surface-1)" stroke="var(--border-strong)" stroke-width="1.25" />
+        <rect x="${cx - 112}" y="${cy - 36}" width="224" height="72" rx="18" fill="var(--glass-svg-hub)" stroke="var(--border-strong)" stroke-width="1.3" />
         <text x="${cx}" y="${cy - 8}" text-anchor="middle" fill="var(--text-primary)" font-size="12.5" font-weight="700" font-family="var(--font-mono)">${esc(centerLabel)}</text>
         <text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="var(--font-mono)">${esc(centerSub)}</text>
       </g>

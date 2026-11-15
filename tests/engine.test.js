@@ -7,7 +7,7 @@ import { detectBuildStack } from '../src/engine/stack.js';
 import { analyzeScan } from '../src/engine/analyzer.js';
 import { buildSampleScan } from '../src/engine/sample.js';
 import { parseGitHubInput } from '../src/engine/github.js';
-import { extractOtpCodes, formatCountdown, isValidUuid } from '../src/ui/tempmail.js';
+import { extractActionLinks, extractOtpCodes, formatCountdown, isValidUuid } from '../src/ui/tempmail.js';
 import { classifySubdomainList, normalizeRootDomain } from '../src/ui/subdomains.js';
 import { createAppServer, isBlockedIP } from '../server.js';
 
@@ -287,6 +287,13 @@ test('tempmail helpers: OTP extraction, countdown formatting, and UUID validatio
 
   const expired = formatCountdown('2026-11-15T19:59:00Z', now);
   assert.equal(expired.expired, true);
+
+  const openEnded = formatCountdown(null, now);
+  assert.equal(openEnded.expired, false);
+  assert.equal(openEnded.label, 'Active');
+
+  const links = extractActionLinks('Confirm your email at https://app.example.com/verify?token=abc123 thanks!');
+  assert.deepEqual(links, ['https://app.example.com/verify?token=abc123']);
 });
 
 test('subdomains helpers: root domain normalization and dev/staging classification', () => {
@@ -296,16 +303,19 @@ test('subdomains helpers: root domain normalization and dev/staging classificati
 
   const classified = classifySubdomainList('acme.io', [
     'www.acme.io',
+    '*.dev.acme.io',
     'dev.acme.io',
     'staging-api.acme.io',
     'api.acme.io',
     'cdn.acme.io',
-    'blog.acme.io'
+    'blog.acme.io',
+    'unrelated.other.org'
   ]);
 
   assert.equal(classified.counts.dev, 2);
   assert.equal(classified.counts.api, 1);
   assert.equal(classified.counts.cdn, 1);
+  assert.equal(classified.rows.some((r) => r.host === 'unrelated.other.org'), false);
   // Dev hosts sorted first
   assert.equal(classified.rows[0].bucket, 'dev');
   assert.equal(classified.rows[1].bucket, 'dev');

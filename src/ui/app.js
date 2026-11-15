@@ -286,8 +286,9 @@ function renderReportBanner(report) {
   const transportLabels = {
     server: 'Server Deep Crawler',
     'custom-worker': 'Custom Worker Proxy',
-    'browser-relay': 'Browser Relay',
+    'browser-relay': 'Browser Multi-Relay',
     'browser-direct': 'Browser Direct',
+    'browser-dns': 'DNS-over-HTTPS',
     'github-api': 'GitHub REST API',
     local: 'Client-Side Local'
   };
@@ -331,27 +332,27 @@ function renderKpiStrip(report) {
     .join(', ') || 'No framework matched';
 
   document.getElementById('kpiStrip').innerHTML = `
-    <button type="button" class="kpi-card spotlight" data-jump-tab="dev">
+    <button type="button" class="kpi-card glass-surface spotlight" data-jump-tab="dev">
       <div class="kpi-label">Dev / Staging / Preview</div>
       <div class="kpi-value amber">${c.devSites}</div>
       <div class="kpi-sub">${c.devSites > 0 ? 'Non-prod hosts found in code' : 'No non-prod hosts exposed'}</div>
     </button>
-    <button type="button" class="kpi-card" data-jump-tab="domains">
+    <button type="button" class="kpi-card glass-surface" data-jump-tab="domains">
       <div class="kpi-label">Unique Domains</div>
       <div class="kpi-value cyan">${c.totalDomains}</div>
       <div class="kpi-sub">${c.apexDomains} apex · ${c.firstParty} first-party</div>
     </button>
-    <button type="button" class="kpi-card" data-jump-tab="domains" data-jump-filter="api">
+    <button type="button" class="kpi-card glass-surface" data-jump-tab="domains" data-jump-filter="api">
       <div class="kpi-label">API &amp; Service Hosts</div>
       <div class="kpi-value green">${c.apiDomains}</div>
       <div class="kpi-sub">${c.cdnDomains} CDN · ${c.thirdParty} SaaS</div>
     </button>
-    <button type="button" class="kpi-card" data-jump-tab="stack">
+    <button type="button" class="kpi-card glass-surface" data-jump-tab="stack">
       <div class="kpi-label">Build Stack</div>
       <div class="kpi-value violet">${c.technologies}</div>
       <div class="kpi-sub">${esc(topFrameworks)}</div>
     </button>
-    <button type="button" class="kpi-card" data-jump-tab="code">
+    <button type="button" class="kpi-card glass-surface" data-jump-tab="code">
       <div class="kpi-label">Artifacts Scanned</div>
       <div class="kpi-value">${c.artifacts}</div>
       <div class="kpi-sub">${c.sourceMaps} sourcemaps · ${c.envHints} env refs</div>
@@ -1183,11 +1184,11 @@ async function init() {
   const pill = document.getElementById('engineStatusPill');
   const pillText = document.getElementById('engineStatusText');
   if (health.available) {
-    pill.classList.add('live');
+    pill.classList.add('online');
     pillText.textContent = 'Server Ready';
   } else {
-    pill.classList.add('static');
-    pillText.textContent = 'Pages Mode';
+    pill.classList.add('relay');
+    pillText.textContent = 'Browser Live';
   }
 
   // Brand click returns to Tab 1 (Temp Mail)

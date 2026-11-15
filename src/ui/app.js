@@ -2,6 +2,8 @@ import { buildSampleScan } from '../engine/sample.js';
 import { checkServerAvailability, scanGitHub, scanRawArtifacts, scanWebsiteUrl } from './scanner.js';
 import { renderTopologySvg } from './graph.js';
 import { exportDomainsCsv, exportReportJson, exportReportMarkdown } from './export.js';
+import { createTempMailController } from './tempmail.js';
+import { createSubdomainsController } from './subdomains.js';
 
 const STORAGE_KEYS = {
   HISTORY: 'devtrace_history_v1',
@@ -10,7 +12,10 @@ const STORAGE_KEYS = {
   GH_TOKEN: 'devtrace_gh_token_session'
 };
 
+const VALID_HUD_TABS = new Set(['tempmail', 'subdomains', 'inspector']);
+
 const state = {
+  hudTab: 'tempmail',
   mode: 'website',
   serverAvailable: false,
   scanning: false,
@@ -1045,6 +1050,7 @@ function openHistoryDrawer() {
           state.activeTab = 'overview';
           state.selectedArtifactId = item.artifacts?.[0]?.id || null;
           closeAllDrawers();
+          setHudTab('inspector');
           renderWorkspace();
         }
       });
@@ -1096,6 +1102,34 @@ function updateAttachedFilesUI() {
   }
 }
 
+// ===================== TOP HUD TABS (3 PRIMARY TABS) =====================
+
+function setHudTab(tabId, { updateHash = true } = {}) {
+  const target = VALID_HUD_TABS.has(tabId) ? tabId : 'tempmail';
+  state.hudTab = target;
+
+  document.querySelectorAll('[data-hud-tab]').forEach((btn) => {
+    const active = btn.dataset.hudTab === target;
+    btn.classList.toggle('active', active);
+    btn.setAttribute('aria-selected', String(active));
+  });
+
+  document.querySelectorAll('[data-hud-panel]').forEach((panel) => {
+    panel.classList.toggle('hidden', panel.dataset.hudPanel !== target);
+  });
+
+  if (updateHash && location.hash !== `#${target}`) {
+    history.replaceState(null, '', `#${target}`);
+  }
+}
+
+function getRuntimeContext() {
+  return {
+    serverAvailable: state.serverAvailable,
+    workerUrl: document.getElementById('optWorkerUrl')?.value?.trim() || ''
+  };
+}
+
 // ===================== BOOTSTRAP & EVENTS =====================
 
 async function init() {
@@ -1106,6 +1140,43 @@ async function init() {
   loadSettings();
   loadHistory();
 
+  // Initialize Tab 1 (Temp Mail) & Tab 2 (Subdomains) controllers
+  const tempMail = createTempMailController({
+    container: document.getElementById('panel-tempmail'),
+    getContext: getRuntimeContext,
+    copyText,
+    showToast
+  });
+  tempMail.init();
+
+  const subdomains = createSubdomainsController({
+    container: document.getElementById('panel-subdomains'),
+    getContext: getRuntimeContext,
+    copyText,
+    showToast,
+    onInspectHost: (url) => {
+      setHudTab('inspector');
+      setMode('website');
+      const input = document.getElementById('websiteInput');
+      if (input) input.value = url;
+      handleWebsiteScan(url);
+    }
+  });
+  subdomains.init();
+
+  // Restore initial top HUD tab from URL hash (defaults to Tab 1: Temp Mail)
+  const initialHash = location.hash.replace(/^#/, '').toLowerCase();
+  setHudTab(VALID_HUD_TABS.has(initialHash) ? initialHash : 'tempmail', { updateHash: false });
+
+  document.querySelectorAll('[data-hud-tab]').forEach((btn) => {
+    btn.addEventListener('click', () => setHudTab(btn.dataset.hudTab));
+  });
+
+  window.addEventListener('hashchange', () => {
+    const h = location.hash.replace(/^#/, '').toLowerCase();
+    if (VALID_HUD_TABS.has(h)) setHudTab(h, { updateHash: false });
+  });
+
   // Check if Node server engine is running
   const health = await checkServerAvailability();
   state.serverAvailable = health.available;
@@ -1113,18 +1184,16 @@ async function init() {
   const pillText = document.getElementById('engineStatusText');
   if (health.available) {
     pill.classList.add('live');
-    pillText.textContent = 'Server Crawler Ready';
+    pillText.textContent = 'Server Ready';
   } else {
     pill.classList.add('static');
-    pillText.textContent = 'Static / Browser Mode';
+    pillText.textContent = 'Pages Mode';
   }
 
-  // Brand reset
+  // Brand click returns to Tab 1 (Temp Mail)
   document.getElementById('brandReset').addEventListener('click', (e) => {
     e.preventDefault();
-    state.report = null;
-    setStatus(null, '');
-    renderWorkspace();
+    setHudTab('tempmail');
   });
 
   // Theme toggle
@@ -1135,7 +1204,7 @@ async function init() {
     localStorage.setItem(STORAGE_KEYS.THEME, next);
   });
 
-  // Mode tabs
+  // Inspector input mode tabs
   document.querySelectorAll('.mode-tab').forEach((btn) => {
     btn.addEventListener('click', () => setMode(btn.dataset.mode));
   });
@@ -1146,8 +1215,7 @@ async function init() {
     const isHidden = drawer.classList.toggle('hidden');
     document.getElementById('optionsToggleBtn')?.setAttribute('aria-expanded', String(!isHidden));
   };
-  document.getElementById('optionsToggleBtn').addEventListener('click', toggleOptions);
-  document.getElementById('optionsToggleBtnGit').addEventListener('click', toggleOptions);
+  document.getElementById('optionsToggleBtn')?.addEventListener('click', toggleOptions);
 
   // Save settings on change
   ['optMaxBundles', 'optTransport', 'optWorkerUrl', 'optGithubToken', 'optProbeMeta'].forEach((id) => {

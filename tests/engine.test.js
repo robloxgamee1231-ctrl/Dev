@@ -7,6 +7,8 @@ import { detectBuildStack } from '../src/engine/stack.js';
 import { analyzeScan } from '../src/engine/analyzer.js';
 import { buildSampleScan } from '../src/engine/sample.js';
 import { parseGitHubInput } from '../src/engine/github.js';
+import { extractOtpCodes, formatCountdown, isValidUuid } from '../src/ui/tempmail.js';
+import { classifySubdomainList, normalizeRootDomain } from '../src/ui/subdomains.js';
 import { createAppServer, isBlockedIP } from '../server.js';
 
 test('tlds: rejects JS property noise and file extensions while keeping real hosts', () => {
@@ -207,10 +209,20 @@ test('HTTP server end-to-end: health, static UI, SSRF block, and deep crawl of m
     const health = await healthRes.json();
     assert.equal(health.ok, true);
 
-    // Static index.html
+    // Static index.html includes Z.ai HUD and 3 primary tabs
     const htmlRes = await fetch(`http://127.0.0.1:${strictPort}/`);
     assert.equal(htmlRes.status, 200);
-    assert.ok((await htmlRes.text()).includes('DEVTRACE'));
+    const htmlBody = await htmlRes.text();
+    assert.ok(htmlBody.includes('DevTrace'));
+    assert.ok(htmlBody.includes('Temp Mail'));
+    assert.ok(htmlBody.includes('Subdomains'));
+    assert.ok(htmlBody.includes('Site Inspector'));
+
+    // Validation checks on new proxy routes
+    const badSubRes = await fetch(`http://127.0.0.1:${strictPort}/api/subdomains?domain=not_a_domain`);
+    assert.equal(badSubRes.status, 400);
+    const badMailRes = await fetch(`http://127.0.0.1:${strictPort}/api/mailboxes/invalid-id`);
+    assert.equal(badMailRes.status, 400);
 
     // SSRF rejection on strict server
     const ssrfRes = await fetch(`http://127.0.0.1:${strictPort}/api/scan`, {
@@ -255,3 +267,47 @@ test('HTTP server end-to-end: health, static UI, SSRF block, and deep crawl of m
     testApp.close();
   }
 });
+
+test('tempmail helpers: OTP extraction, countdown formatting, and UUID validation', () => {
+  assert.equal(isValidUuid('550e8400-e29b-41d4-a716-446655440000'), true);
+  assert.equal(isValidUuid('not-a-uuid'), false);
+
+  const codes = extractOtpCodes('Your verification code is 849201.\nExpires in 10 minutes.', 'Verify your login');
+  assert.deepEqual(codes, ['849201']);
+
+  const now = Date.parse('2026-11-15T20:00:00Z');
+  const active = formatCountdown('2026-11-15T20:09:30Z', now);
+  assert.equal(active.label, '09:30');
+  assert.equal(active.expired, false);
+  assert.equal(active.urgent, false);
+
+  const urgent = formatCountdown('2026-11-15T20:01:15Z', now);
+  assert.equal(urgent.urgent, true);
+  assert.equal(urgent.expired, false);
+
+  const expired = formatCountdown('2026-11-15T19:59:00Z', now);
+  assert.equal(expired.expired, true);
+});
+
+test('subdomains helpers: root domain normalization and dev/staging classification', () => {
+  assert.equal(normalizeRootDomain('https://www.GitHub.com/orgs/test'), 'github.com');
+  assert.equal(normalizeRootDomain('api.staging.acme.co.uk'), 'acme.co.uk');
+  assert.equal(normalizeRootDomain('invalid'), '');
+
+  const classified = classifySubdomainList('acme.io', [
+    'www.acme.io',
+    'dev.acme.io',
+    'staging-api.acme.io',
+    'api.acme.io',
+    'cdn.acme.io',
+    'blog.acme.io'
+  ]);
+
+  assert.equal(classified.counts.dev, 2);
+  assert.equal(classified.counts.api, 1);
+  assert.equal(classified.counts.cdn, 1);
+  // Dev hosts sorted first
+  assert.equal(classified.rows[0].bucket, 'dev');
+  assert.equal(classified.rows[1].bucket, 'dev');
+});
+

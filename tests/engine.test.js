@@ -7,8 +7,7 @@ import { detectBuildStack } from '../src/engine/stack.js';
 import { analyzeScan } from '../src/engine/analyzer.js';
 import { buildSampleScan } from '../src/engine/sample.js';
 import { parseGitHubInput } from '../src/engine/github.js';
-import { extractActionLinks, extractOtpCodes, formatCountdown, isValidUuid } from '../src/ui/tempmail.js';
-import { classifySubdomainList, normalizeRootDomain } from '../src/ui/subdomains.js';
+import { classifySubdomainList, normalizeRootDomain, sortRows } from '../src/ui/subdomains.js';
 import { createAppServer, isBlockedIP } from '../server.js';
 
 test('tlds: rejects JS property noise and file extensions while keeping real hosts', () => {
@@ -209,20 +208,18 @@ test('HTTP server end-to-end: health, static UI, SSRF block, and deep crawl of m
     const health = await healthRes.json();
     assert.equal(health.ok, true);
 
-    // Static index.html includes Z.ai HUD and 3 primary tabs
+    // Static index.html includes Liquid Glass 2-tab HUD (Subdomains + Site Inspector, no Temp Mail)
     const htmlRes = await fetch(`http://127.0.0.1:${strictPort}/`);
     assert.equal(htmlRes.status, 200);
     const htmlBody = await htmlRes.text();
     assert.ok(htmlBody.includes('DevTrace'));
-    assert.ok(htmlBody.includes('Temp Mail'));
     assert.ok(htmlBody.includes('Subdomains'));
     assert.ok(htmlBody.includes('Site Inspector'));
+    assert.equal(htmlBody.includes('Temp Mail'), false, 'Temp Mail tab must be removed');
 
-    // Validation checks on new proxy routes
+    // Validation checks on subdomain proxy route
     const badSubRes = await fetch(`http://127.0.0.1:${strictPort}/api/subdomains?domain=not_a_domain`);
     assert.equal(badSubRes.status, 400);
-    const badMailRes = await fetch(`http://127.0.0.1:${strictPort}/api/mailboxes/invalid-id`);
-    assert.equal(badMailRes.status, 400);
 
     // SSRF rejection on strict server
     const ssrfRes = await fetch(`http://127.0.0.1:${strictPort}/api/scan`, {
@@ -268,35 +265,7 @@ test('HTTP server end-to-end: health, static UI, SSRF block, and deep crawl of m
   }
 });
 
-test('tempmail helpers: OTP extraction, countdown formatting, and UUID validation', () => {
-  assert.equal(isValidUuid('550e8400-e29b-41d4-a716-446655440000'), true);
-  assert.equal(isValidUuid('not-a-uuid'), false);
-
-  const codes = extractOtpCodes('Your verification code is 849201.\nExpires in 10 minutes.', 'Verify your login');
-  assert.deepEqual(codes, ['849201']);
-
-  const now = Date.parse('2026-11-15T20:00:00Z');
-  const active = formatCountdown('2026-11-15T20:09:30Z', now);
-  assert.equal(active.label, '09:30');
-  assert.equal(active.expired, false);
-  assert.equal(active.urgent, false);
-
-  const urgent = formatCountdown('2026-11-15T20:01:15Z', now);
-  assert.equal(urgent.urgent, true);
-  assert.equal(urgent.expired, false);
-
-  const expired = formatCountdown('2026-11-15T19:59:00Z', now);
-  assert.equal(expired.expired, true);
-
-  const openEnded = formatCountdown(null, now);
-  assert.equal(openEnded.expired, false);
-  assert.equal(openEnded.label, 'Active');
-
-  const links = extractActionLinks('Confirm your email at https://app.example.com/verify?token=abc123 thanks!');
-  assert.deepEqual(links, ['https://app.example.com/verify?token=abc123']);
-});
-
-test('subdomains helpers: root domain normalization and dev/staging classification', () => {
+test('subdomains helpers: root domain normalization, dev/staging classification, and subdomain.app sort modes', () => {
   assert.equal(normalizeRootDomain('https://www.GitHub.com/orgs/test'), 'github.com');
   assert.equal(normalizeRootDomain('api.staging.acme.co.uk'), 'acme.co.uk');
   assert.equal(normalizeRootDomain('invalid'), '');
@@ -316,8 +285,17 @@ test('subdomains helpers: root domain normalization and dev/staging classificati
   assert.equal(classified.counts.api, 1);
   assert.equal(classified.counts.cdn, 1);
   assert.equal(classified.rows.some((r) => r.host === 'unrelated.other.org'), false);
-  // Dev hosts sorted first
+  // Dev hosts sorted first by default
   assert.equal(classified.rows[0].bucket, 'dev');
   assert.equal(classified.rows[1].bucket, 'dev');
+
+  // 'recent' preserves exact subdomain.app recency order
+  sortRows(classified.rows, 'recent');
+  assert.equal(classified.rows[0].host, 'www.acme.io');
+  assert.equal(classified.rows[1].host, 'dev.acme.io');
+
+  // 'alpha' sorts alphabetically
+  sortRows(classified.rows, 'alpha');
+  assert.equal(classified.rows[0].host, 'api.acme.io');
 });
 

@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DevTrace — Temp Mail, Subdomains & Site Code Inspector</title>
-  <meta name="description" content="Liquid Glass developer HUD: working disposable Temp Mail, Subdomain discovery, and Site Code & Build Stack Inspector." />
+  <title>DevTrace — Subdomains & Site Code Inspector</title>
+  <meta name="description" content="Liquid Glass developer HUD: Subdomain discovery powered by subdomain.app and Site Code & Build Stack Inspector." />
   <link rel="stylesheet" href="./styles/main.css" />
 </head>
 <body>
@@ -35,13 +35,9 @@
           </span>
         </div>
 
-        <!-- 3 Primary Liquid Glass Segmented Tabs -->
+        <!-- 2 Primary Liquid Glass Segmented Tabs -->
         <nav class="hud-tabs" role="tablist" aria-label="Primary Workspace">
-          <button type="button" class="hud-tab active" data-hud-tab="tempmail" role="tab" aria-selected="true">
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
-            <span>Temp Mail</span>
-          </button>
-          <button type="button" class="hud-tab" data-hud-tab="subdomains" role="tab" aria-selected="false">
+          <button type="button" class="hud-tab active" data-hud-tab="subdomains" role="tab" aria-selected="true">
             <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 4 9 14 14 0 0 1-4 9 14 14 0 0 1-4-9 14 14 0 0 1 4-9z"/></svg>
             <span>Subdomains</span>
           </button>
@@ -68,15 +64,15 @@
 
     <!-- Single-Tab Active Workspace Container -->
     <main class="main-wrap">
-      <!-- TAB 1: TEMP MAIL -->
-      <section class="hud-panel" id="panel-tempmail" data-hud-panel="tempmail" aria-label="Temp Mail"></section>
+      <!-- TAB 1: SUBDOMAINS (powered by subdomain.app) -->
+      <section class="hud-panel" id="panel-subdomains" data-hud-panel="subdomains" aria-label="Subdomains"></section>
 
-      <!-- TAB 2: SUBDOMAINS -->
-      <section class="hud-panel hidden" id="panel-subdomains" data-hud-panel="subdomains" aria-label="Subdomains"></section>
-
-      <!-- TAB 3: SITE INSPECTOR -->
+      <!-- TAB 2: SITE INSPECTOR -->
       <section class="hud-panel hidden" id="panel-inspector" data-hud-panel="inspector" aria-label="Site Inspector">
         <div class="zai-hero">
+          <span class="hero-kicker">
+            <span class="mono">95+ stack signatures · live bundles, headers &amp; GitHub repos</span>
+          </span>
           <h1 class="zai-title">Site Code &amp; Build Stack Inspector</h1>
           <p class="zai-subtitle">Inspects live websites, linked JS bundles, DNS records, and GitHub repos to uncover dev/staging domains and 95+ build stack technologies.</p>
         </div>
@@ -291,7 +287,7 @@
         <button type="button" class="btn btn-glass btn-icon" id="workerModalClose" aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
-        <p class="modal-p">All three tools (<strong>Temp Mail</strong>, <strong>Subdomains</strong>, and <strong>Site Inspector</strong>) now work out of the box directly on GitHub Pages via CORS-native APIs &amp; multi-relay fallback. Optionally deploy <code>worker/cloudflare-worker.js</code> to Cloudflare Workers (free tier) if you want direct <code>throwawaymail.app</code> mailboxes or full raw HTTP response headers from static Pages.</p>
+        <p class="modal-p">Both <strong>Subdomains</strong> (powered by <code>subdomain.app</code>) and <strong>Site Inspector</strong> work directly on GitHub Pages. Optionally deploy <code>worker/cloudflare-worker.js</code> to Cloudflare Workers (free tier) for dedicated zero-rate-limit <code>api.subdomain.app</code> lookups and full raw HTTP response headers from static Pages, then paste the URL under <strong>Site Inspector → Options → Custom Worker Proxy URL</strong>.</p>
         <div class="code-block-header">
           <span>worker/cloudflare-worker.js</span>
           <button type="button" class="btn btn-glass btn-xs" id="copyWorkerCodeBtn">Copy Worker Code</button>

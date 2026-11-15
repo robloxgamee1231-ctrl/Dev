@@ -2,7 +2,6 @@ import { buildSampleScan } from '../engine/sample.js';
 import { checkServerAvailability, scanGitHub, scanRawArtifacts, scanWebsiteUrl } from './scanner.js';
 import { renderTopologySvg } from './graph.js';
 import { exportDomainsCsv, exportReportJson, exportReportMarkdown } from './export.js';
-import { createTempMailController } from './tempmail.js';
 import { createSubdomainsController } from './subdomains.js';
 
 const STORAGE_KEYS = {
@@ -12,10 +11,10 @@ const STORAGE_KEYS = {
   GH_TOKEN: 'devtrace_gh_token_session'
 };
 
-const VALID_HUD_TABS = new Set(['tempmail', 'subdomains', 'inspector']);
+const VALID_HUD_TABS = new Set(['subdomains', 'inspector']);
 
 const state = {
-  hudTab: 'tempmail',
+  hudTab: 'subdomains',
   mode: 'website',
   serverAvailable: false,
   scanning: false,
@@ -1103,10 +1102,10 @@ function updateAttachedFilesUI() {
   }
 }
 
-// ===================== TOP HUD TABS (3 PRIMARY TABS) =====================
+// ===================== TOP HUD TABS (2 PRIMARY TABS) =====================
 
 function setHudTab(tabId, { updateHash = true } = {}) {
-  const target = VALID_HUD_TABS.has(tabId) ? tabId : 'tempmail';
+  const target = VALID_HUD_TABS.has(tabId) ? tabId : 'subdomains';
   state.hudTab = target;
 
   document.querySelectorAll('[data-hud-tab]').forEach((btn) => {
@@ -1141,15 +1140,7 @@ async function init() {
   loadSettings();
   loadHistory();
 
-  // Initialize Tab 1 (Temp Mail) & Tab 2 (Subdomains) controllers
-  const tempMail = createTempMailController({
-    container: document.getElementById('panel-tempmail'),
-    getContext: getRuntimeContext,
-    copyText,
-    showToast
-  });
-  tempMail.init();
-
+  // Initialize Tab 1 (Subdomains powered by subdomain.app)
   const subdomains = createSubdomainsController({
     container: document.getElementById('panel-subdomains'),
     getContext: getRuntimeContext,
@@ -1165,9 +1156,9 @@ async function init() {
   });
   subdomains.init();
 
-  // Restore initial top HUD tab from URL hash (defaults to Tab 1: Temp Mail)
+  // Restore initial top HUD tab from URL hash (defaults to Tab 1: Subdomains)
   const initialHash = location.hash.replace(/^#/, '').toLowerCase();
-  setHudTab(VALID_HUD_TABS.has(initialHash) ? initialHash : 'tempmail', { updateHash: false });
+  setHudTab(VALID_HUD_TABS.has(initialHash) ? initialHash : 'subdomains', { updateHash: false });
 
   document.querySelectorAll('[data-hud-tab]').forEach((btn) => {
     btn.addEventListener('click', () => setHudTab(btn.dataset.hudTab));
@@ -1191,10 +1182,10 @@ async function init() {
     pillText.textContent = 'Browser Live';
   }
 
-  // Brand click returns to Tab 1 (Temp Mail)
+  // Brand click returns to Tab 1 (Subdomains)
   document.getElementById('brandReset').addEventListener('click', (e) => {
     e.preventDefault();
-    setHudTab('tempmail');
+    setHudTab('subdomains');
   });
 
   // Theme toggle

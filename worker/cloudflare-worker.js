@@ -1,14 +1,12 @@
 // Optional Cloudflare Worker proxy for DevTrace on GitHub Pages.
-// Supports full HTTP header website scans, api.subdomain.app queries,
-// and throwawaymail.app mailbox calls without CORS limits.
+// Supports full HTTP header website scans and direct api.subdomain.app queries without CORS limits.
 
 const BLOCKED_HOSTS = /^(?:localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[::1\])/i;
-const WRITE_ALLOWED_HOSTS = new Set(['throwawaymail.app']);
 
 function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400'
   };
@@ -19,6 +17,12 @@ export default {
     const origin = request.headers.get('Origin') || '*';
     if (request.method === 'OPTIONS') {
       return new Response(null, { status: 204, headers: corsHeaders(origin) });
+    }
+    if (request.method !== 'GET') {
+      return new Response(JSON.stringify({ error: 'Only GET is allowed.' }), {
+        status: 405,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) }
+      });
     }
 
     const reqUrl = new URL(request.url);
@@ -42,17 +46,9 @@ export default {
       });
     }
 
-    const method = (reqUrl.searchParams.get('method') || request.method || 'GET').toUpperCase();
-    if (method !== 'GET' && !WRITE_ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) {
-      return new Response(JSON.stringify({ error: 'Only GET is allowed for general targets.' }), {
-        status: 405,
-        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) }
-      });
-    }
-
     try {
       const upstream = await fetch(parsed.toString(), {
-        method,
+        method: 'GET',
         redirect: 'follow',
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; DevTraceWorker/1.0)',
@@ -60,7 +56,7 @@ export default {
         }
       });
 
-      const body = upstream.status === 204 ? '' : (await upstream.text()).slice(0, 1_500_000);
+      const body = (await upstream.text()).slice(0, 1_500_000);
       const headers = {};
       upstream.headers.forEach((v, k) => {
         headers[k.toLowerCase()] = v;

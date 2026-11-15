@@ -1,26 +1,27 @@
 # DevTrace
 
-Z.ai-inspired monochrome developer HUD combining three single-tab workspaces in one zero-build site (ready for GitHub Pages and local Node.js self-hosting):
+**DevTrace** is a zero-dependency Liquid Glass developer HUD with two focused workspaces:
 
-1. **Temp Mail** (`https://throwawaymail.app/api/docs`) — Instant 10-minute disposable inbox (`POST /api/mailboxes`), live countdown timer, 5-second auto-refresh, mailbox UUID restore, automatic verification/OTP code extraction, and sandboxed HTML email preview.
-2. **Subdomains** (`https://api.subdomain.app/v1/query`) — Enumerates up to 10,000 known subdomains (~15s lookup with live elapsed timer), automatically separates dev/staging/QA/API/CDN hosts, exports TXT/JSON, and jumps straight into Site Inspector with one click.
-3. **Site Inspector** — Crawls live website HTML, JS bundles, CSS, HTTP headers, manifests, GitHub repositories, and dropped raw code / `.har` captures to find dev/staging/preview domains and fingerprint 95+ build stack technologies with exact `file:line` evidence.
+1. **Subdomains** (powered by [`subdomain.app`](https://subdomain.app/)) — Queries `https://api.subdomain.app/v1/query?domain=...` across 5.4B+ indexed subdomains (up to 10,000 hosts per domain), automatically classifies **Dev / Staging / Preview**, **API & Auth**, and **CDN** hosts, sorts by Dev-First / Most Recently Seen / A–Z, verifies live A/CNAME DNS over HTTPS, exports TXT/JSON, and jumps straight into Site Inspector in one click.
+2. **Site Inspector** — Crawls live websites (HTML, linked JS bundles, CSS, DNS-over-HTTPS, HTTP headers), GitHub repositories, and pasted raw source / `.har` captures to expose hidden dev/staging/preview domains and fingerprint **95+ build stack technologies** with exact `file:line` evidence and an interactive topology graph.
 
-## Quick Start
+## Live Site (GitHub Pages)
 
-### Local Node.js Server (Zero Dependencies)
+- **Production HUD**: `https://robloxgamee1231-ctrl.github.io/Dev/`
+
+## Run Locally (Node >= 20, zero npm dependencies)
 
 ```bash
 npm start
-# Open http://localhost:3000
+# Listening on http://0.0.0.0:3000
 ```
 
-Run tests:
+Run automated tests:
 
 ```bash
 npm test
 ```
 
-### GitHub Pages Deployment
+## Optional Cloudflare Worker Proxy
 
-Push or merge to `main` — `.github/workflows/pages.yml` deploys the static site automatically. For CORS-free live headers, Temp Mail, and Subdomains queries from GitHub Pages, deploy `worker/cloudflare-worker.js` to Cloudflare Workers (free tier) and set its URL in **Site Inspector → Options → Custom Worker Proxy URL**.
+Both tabs work directly on static GitHub Pages. For dedicated zero-rate-limit `api.subdomain.app` lookups and raw HTTP response headers in Site Inspector on GitHub Pages, deploy `worker/cloudflare-worker.js` to Cloudflare Workers and paste its URL under **Site Inspector → Options → Custom Worker Proxy URL**.

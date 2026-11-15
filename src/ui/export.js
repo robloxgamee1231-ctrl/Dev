@@ -66,8 +66,41 @@ export function exportReportMarkdown(report) {
   lines.push(`- **Scanned:** ${report.scannedAt}`);
   lines.push(`- **Mode / Transport:** ${report.mode} (${report.transport})`);
   lines.push(`- **Architecture Summary:** ${report.architectureSummary}`);
-  lines.push(`- **Counts:** ${report.counts.devSites} dev/staging/preview sites · ${report.counts.totalDomains} domains · ${report.counts.technologies} technologies · ${report.counts.artifacts} artifacts`);
+  lines.push(`- **Counts:** ${report.counts.devSites} dev/staging/preview sites · ${report.counts.totalDomains} domains · ${report.counts.technologies} technologies · ${report.counts.apiEndpoints || 0} API endpoints · ${report.counts.frameworkConfigs || 0} framework configs · ${report.counts.artifacts} artifacts`);
   lines.push('');
+
+  if (report.sourceIntel) {
+    lines.push('## Source Code Intelligence');
+    lines.push('');
+    const eps = report.sourceIntel.apiEndpoints || [];
+    const cfgs = report.sourceIntel.frameworkConfigs || [];
+    const refs = report.sourceIntel.configReferences || [];
+    if (cfgs.length > 0) {
+      lines.push('### Framework Configurations');
+      for (const c of cfgs) {
+        lines.push(`- **${c.framework}** (${c.kind}) — ${c.detail} (\`${c.artifact}:${c.line}\`)`);
+      }
+      lines.push('');
+    }
+    if (eps.length > 0) {
+      lines.push('### Publicly Referenced API Endpoints');
+      lines.push('| Method | Kind | Endpoint | Location |');
+      lines.push('|---|---|---|---|');
+      for (const ep of eps.slice(0, 60)) {
+        lines.push(`| \`${ep.method}\` | ${ep.kind} | \`${ep.url}\` | \`${ep.artifact}:${ep.line}\` |`);
+      }
+      lines.push('');
+    }
+    if (refs.length > 0) {
+      lines.push('### Exposed Configuration References (Secret Values Redacted)');
+      lines.push('| Key | Category | Safe Preview | Location |');
+      lines.push('|---|---|---|---|');
+      for (const ref of refs.slice(0, 60)) {
+        lines.push(`| \`${ref.keyName}\` | ${ref.category} | \`${ref.valuePreview}\` | \`${ref.artifact}:${ref.line}\` |`);
+      }
+      lines.push('');
+    }
+  }
 
   lines.push('## Dev, Staging & Preview Sites');
   lines.push('');

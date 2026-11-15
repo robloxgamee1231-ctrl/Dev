@@ -17,7 +17,7 @@ export async function checkServerAvailability() {
     const res = await fetch('./api/health', { cache: 'no-store', signal: AbortSignal.timeout(1800) });
     if (!res.ok) return { available: false };
     const data = await res.json();
-    return { available: Boolean(data?.ok), info: data };
+    return { available: Boolean(data?.ok), vaultReady: Boolean(data?.vaultReady), info: data };
   } catch {
     return { available: false };
   }

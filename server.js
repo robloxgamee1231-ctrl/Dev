@@ -168,7 +168,7 @@ async function readBoundedText(response, maxBytes = MAX_FILE_BYTES) {
   return new TextDecoder('utf-8', { fatal: false }).decode(combined);
 }
 
-async function safeFetch(url, { allowLocalTest = false, maxBytes = MAX_FILE_BYTES } = {}) {
+async function safeFetch(url, { allowLocalTest = false, maxBytes = MAX_FILE_BYTES, timeoutMs = FETCH_TIMEOUT_MS } = {}) {
   let currentUrl = url;
 
   for (let hop = 0; hop <= MAX_REDIRECTS; hop++) {
@@ -178,9 +178,9 @@ async function safeFetch(url, { allowLocalTest = false, maxBytes = MAX_FILE_BYTE
       res = await fetch(currentUrl, {
         method: 'GET',
         redirect: 'manual',
-        signal: AbortSignal.timeout(FETCH_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
         headers: {
-          'User-Agent': 'Mozilla/5.0 (compatible; DevTrace/1.0; +https://github.com/robloxgamee1231-ctrl/Dev)',
+          'User-Agent': 'Mozilla/5.0 (compatible; DEVTRACER/1.0; +https://github.com/robloxgamee1231-ctrl/Dev)',
           Accept: 'text/html,application/xhtml+xml,application/javascript,text/javascript,text/css,application/json,text/plain;q=0.9,*/*;q=0.5',
           'Accept-Language': 'en-US,en;q=0.9'
         }
@@ -344,32 +344,41 @@ export async function performServerWebsiteScan(rawUrl, { maxBundles = 8, probeMe
     );
   }
 
-  // Fetch linked assets concurrently in batches of 4
-  const batchSize = 4;
-  for (let i = 0; i < fetchQueue.length; i += batchSize) {
-    if (totalBytes >= MAX_TOTAL_BYTES) break;
-    const batch = fetchQueue.slice(i, i + batchSize);
-    const settled = await Promise.all(
-      batch.map(async (item) => {
+  // Fetch all linked assets concurrently under a tight 6.5s overall budget
+  if (fetchQueue.length > 0) {
+    const collected = [];
+    const fetchAll = Promise.all(
+      fetchQueue.map(async (item) => {
         try {
-          const r = await safeFetch(item.url, { allowLocalTest, maxBytes: item.maxBytes });
-          if (!r.ok || !r.text) return null;
-          // Skip HTML error pages returned for missing robots.txt / sitemap.xml / .js
-          if (item.type !== 'html' && /^\s*<!doctype html/i.test(r.text)) return null;
-          return {
+          const r = await safeFetch(item.url, { allowLocalTest, maxBytes: item.maxBytes, timeoutMs: 4_800 });
+          if (!r.ok || !r.text) return;
+          if (item.type !== 'html' && /^\s*<!doctype html/i.test(r.text)) return;
+          collected.push({
             name: item.name,
             url: r.finalUrl,
             type: item.type,
             content: r.text,
             bytes: r.text.length
-          };
-        } catch {
-          return null;
-        }
+          });
+        } catch {}
       })
     );
-    for (const art of settled) {
-      if (art && totalBytes + art.bytes <= MAX_TOTAL_BYTES) {
+
+    let budgetTimer;
+    try {
+      await Promise.race([
+        fetchAll,
+        new Promise((resolve) => {
+          budgetTimer = setTimeout(resolve, 6_500);
+          budgetTimer.unref?.();
+        })
+      ]);
+    } finally {
+      clearTimeout(budgetTimer);
+    }
+
+    for (const art of collected) {
+      if (totalBytes + art.bytes <= MAX_TOTAL_BYTES) {
         totalBytes += art.bytes;
         artifacts.push(art);
       }
@@ -520,7 +529,7 @@ export function createAppServer({ allowLocalTest = false } = {}) {
       if (pathname === '/api/health' && req.method === 'GET') {
         return sendJson(res, 200, {
           ok: true,
-          service: 'devtrace',
+          service: 'devtracer',
           transport: 'server',
           nodeVersion: process.version
         });
@@ -572,6 +581,6 @@ if (process.argv[1] && path.resolve(process.argv[1]) === __filename) {
   const PORT = Number(process.env.PORT || 3000);
   const server = createAppServer();
   server.listen(PORT, HOST, () => {
-    console.log(`[DevTrace] Server listening on http://${HOST}:${PORT}`);
+    console.log(`[DEVTRACER] Server listening on http://${HOST}:${PORT}`);
   });
 }

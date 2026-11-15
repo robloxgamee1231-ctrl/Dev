@@ -190,20 +190,24 @@ function setScanningUI(busy) {
 
 // ===================== SCAN EXECUTION =====================
 
-async function runScan(fn) {
+async function runScan(fn, { preserveTabOnFinish = false } = {}) {
   if (state.scanning) return;
   setScanningUI(true);
-  setStatus('loading', 'Initializing scan…');
+  setStatus('loading', 'Initializing fast scan…');
   try {
     const report = await fn();
     state.report = report;
-    state.activeTab = 'overview';
-    state.devFilter = 'all';
-    state.devSearch = '';
-    state.domainFilter = 'all';
-    state.domainSearch = '';
-    state.codeSearch = '';
-    state.selectedArtifactId = report.artifacts?.[0]?.id || null;
+    if (!preserveTabOnFinish) {
+      state.activeTab = 'overview';
+      state.devFilter = 'all';
+      state.devSearch = '';
+      state.domainFilter = 'all';
+      state.domainSearch = '';
+      state.codeSearch = '';
+    }
+    if (!state.selectedArtifactId || !report.artifacts?.some((a) => a.id === state.selectedArtifactId)) {
+      state.selectedArtifactId = report.artifacts?.[0]?.id || null;
+    }
     pushHistory(report);
     setStatus(null, '');
     renderWorkspace();
@@ -216,16 +220,35 @@ async function runScan(fn) {
 
 async function handleWebsiteScan(rawUrl) {
   const opts = saveSettings();
-  await runScan(() =>
-    scanWebsiteUrl(rawUrl, {
-      transport: opts.transport,
-      serverAvailable: state.serverAvailable,
-      maxBundles: opts.maxBundles,
-      probeMeta: opts.probeMeta,
-      customWorkerUrl: opts.workerUrl,
-      onProgress: (p) => setStatus('loading', p.label)
-    })
+  let showedPartial = false;
+  await runScan(
+    () =>
+      scanWebsiteUrl(rawUrl, {
+        transport: opts.transport,
+        serverAvailable: state.serverAvailable,
+        maxBundles: opts.maxBundles,
+        probeMeta: opts.probeMeta,
+        customWorkerUrl: opts.workerUrl,
+        onProgress: (p) => setStatus('loading', p.label),
+        onPartialReport: (partial, label) => {
+          showedPartial = true;
+          state.report = partial;
+          state.activeTab = 'overview';
+          state.devFilter = 'all';
+          state.devSearch = '';
+          state.domainFilter = 'all';
+          state.domainSearch = '';
+          state.codeSearch = '';
+          state.selectedArtifactId = partial.artifacts?.[0]?.id || null;
+          setStatus('loading', label);
+          renderWorkspace();
+        }
+      }),
+    { preserveTabOnFinish: true }
   );
+  if (showedPartial && state.report) {
+    showToast(`Scan complete — ${state.report.counts.artifacts} artifacts inspected`);
+  }
 }
 
 async function handleGitHubScan(rawRepo) {

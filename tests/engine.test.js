@@ -208,11 +208,13 @@ test('HTTP server end-to-end: health, static UI, SSRF block, and deep crawl of m
     const health = await healthRes.json();
     assert.equal(health.ok, true);
 
-    // Static index.html includes Liquid Glass 2-tab HUD (Subdomains + Site Inspector, no Temp Mail)
+    // Static index.html includes DEVTRACER made by ★NDX★ and 2-tab HUD (Subdomains + Site Inspector)
     const htmlRes = await fetch(`http://127.0.0.1:${strictPort}/`);
     assert.equal(htmlRes.status, 200);
     const htmlBody = await htmlRes.text();
-    assert.ok(htmlBody.includes('DevTrace'));
+    assert.ok(htmlBody.includes('DEVTRACER'));
+    assert.ok(htmlBody.includes('NDX'));
+    assert.ok(htmlBody.includes('★'));
     assert.ok(htmlBody.includes('Subdomains'));
     assert.ok(htmlBody.includes('Site Inspector'));
     assert.equal(htmlBody.includes('Temp Mail'), false, 'Temp Mail tab must be removed');

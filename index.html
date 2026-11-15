@@ -3,8 +3,8 @@
 <head>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-  <title>DevTrace — Subdomains & Site Code Inspector</title>
-  <meta name="description" content="Liquid Glass developer HUD: Subdomain discovery powered by subdomain.app and Site Code & Build Stack Inspector." />
+  <title>DEVTRACER — made by ★NDX★</title>
+  <meta name="description" content="DEVTRACER made by ★NDX★ — Liquid Glass Subdomain Discovery (subdomain.app) and Fast Site Code & Build Stack Inspector." />
   <link rel="stylesheet" href="./styles/main.css" />
 </head>
 <body>
@@ -21,13 +21,16 @@
     <div class="topbar-wrap">
       <header class="topbar glass-nav">
         <div class="topbar-left">
-          <a href="./" class="brand" id="brandReset" title="DevTrace Liquid Glass HUD">
+          <a href="./" class="brand" id="brandReset" title="DEVTRACER — made by ★NDX★">
             <span class="brand-mark" aria-hidden="true">
               <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
                 <path d="M5 6h14L5 18h14"></path>
               </svg>
             </span>
-            <span class="brand-name">DevTrace</span>
+            <span class="brand-stack">
+              <span class="brand-name">DEVTRACER</span>
+              <span class="ndx-credit">made by <span class="ndx-star" aria-hidden="true">★</span><span class="ndx-name">NDX</span><span class="ndx-star" aria-hidden="true">★</span></span>
+            </span>
           </a>
           <span class="engine-pill" id="engineStatusPill" title="Active scan transport">
             <span class="dot"></span>
@@ -153,7 +156,7 @@
             <div class="options-grid">
               <label class="opt-field">
                 <span>Max JS Bundles</span>
-                <input type="number" id="optMaxBundles" min="0" max="20" value="8" class="code-input compact" />
+                <input type="number" id="optMaxBundles" min="0" max="20" value="4" class="code-input compact" />
               </label>
               <label class="opt-field">
                 <span>Fetch Transport</span>
@@ -246,6 +249,15 @@
         </div>
       </section>
     </main>
+
+    <!-- Subtle Liquid Glass Signature Footer -->
+    <footer class="hud-footer">
+      <div class="hud-footer-pill glass-surface">
+        <span class="brand-name-sm">DEVTRACER</span>
+        <span class="footer-sep">·</span>
+        <span class="ndx-credit-lg">made by <span class="ndx-star">★</span><span class="ndx-name">NDX</span><span class="ndx-star">★</span></span>
+      </div>
+    </footer>
   </div>
 
   <!-- Slide-Over Evidence Inspector Drawer -->

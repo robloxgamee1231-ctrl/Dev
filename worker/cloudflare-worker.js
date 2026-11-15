@@ -1,13 +1,14 @@
 // Optional Cloudflare Worker proxy for DevTrace on GitHub Pages.
-// Deploy on Cloudflare Workers (free tier) and paste the Worker URL into
-// DevTrace -> Options -> Custom Proxy URL for full HTTP header + JS bundle scans.
+// Supports full HTTP header website scans, api.subdomain.app queries,
+// and throwawaymail.app mailbox calls without CORS limits.
 
 const BLOCKED_HOSTS = /^(?:localhost|127\.|10\.|192\.168\.|169\.254\.|172\.(?:1[6-9]|2\d|3[01])\.|0\.0\.0\.0|\[::1\])/i;
+const WRITE_ALLOWED_HOSTS = new Set(['throwawaymail.app']);
 
 function corsHeaders(origin) {
   return {
     'Access-Control-Allow-Origin': origin || '*',
-    'Access-Control-Allow-Methods': 'GET, OPTIONS',
+    'Access-Control-Allow-Methods': 'GET, POST, DELETE, OPTIONS',
     'Access-Control-Allow-Headers': 'Content-Type',
     'Access-Control-Max-Age': '86400'
   };
@@ -41,16 +42,25 @@ export default {
       });
     }
 
+    const method = (reqUrl.searchParams.get('method') || request.method || 'GET').toUpperCase();
+    if (method !== 'GET' && !WRITE_ALLOWED_HOSTS.has(parsed.hostname.toLowerCase())) {
+      return new Response(JSON.stringify({ error: 'Only GET is allowed for general targets.' }), {
+        status: 405,
+        headers: { 'Content-Type': 'application/json', ...corsHeaders(origin) }
+      });
+    }
+
     try {
       const upstream = await fetch(parsed.toString(), {
+        method,
         redirect: 'follow',
         headers: {
           'User-Agent': 'Mozilla/5.0 (compatible; DevTraceWorker/1.0)',
-          Accept: 'text/html,application/javascript,text/css,application/json,text/plain,*/*'
+          Accept: 'application/json,text/html,application/javascript,text/css,text/plain,*/*'
         }
       });
 
-      const body = (await upstream.text()).slice(0, 1_500_000);
+      const body = upstream.status === 204 ? '' : (await upstream.text()).slice(0, 1_500_000);
       const headers = {};
       upstream.headers.forEach((v, k) => {
         headers[k.toLowerCase()] = v;

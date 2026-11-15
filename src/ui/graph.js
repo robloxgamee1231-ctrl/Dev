@@ -39,8 +39,8 @@ export function renderTopologySvg(report) {
     {
       id: 'api',
       title: 'API & BACKEND',
-      color: '#38bdf8',
-      bg: 'rgba(56, 189, 248, 0.12)',
+      color: '#d4d4d4',
+      bg: 'rgba(255, 255, 255, 0.08)',
       nodes: apiNodes,
       anchorX: width - 165,
       startY: 56,
@@ -61,8 +61,8 @@ export function renderTopologySvg(report) {
     {
       id: 'infra',
       title: 'CDN & SERVICES',
-      color: '#a78bfa',
-      bg: 'rgba(167, 139, 250, 0.12)',
+      color: '#8a8a8a',
+      bg: 'rgba(255, 255, 255, 0.06)',
       nodes: infraNodes,
       anchorX: width - 165,
       startY: 256,
@@ -135,14 +135,14 @@ export function renderTopologySvg(report) {
     <svg class="topology-svg" viewBox="0 0 ${width} ${height}" xmlns="http://www.w3.org/2000/svg" role="img" aria-label="Domain and environment topology graph">
       <defs>
         <radialGradient id="hubGlow" cx="50%" cy="50%" r="50%">
-          <stop offset="0%" stop-color="#38bdf8" stop-opacity="0.22" />
-          <stop offset="100%" stop-color="#38bdf8" stop-opacity="0" />
+          <stop offset="0%" stop-color="#ffffff" stop-opacity="0.08" />
+          <stop offset="100%" stop-color="#ffffff" stop-opacity="0" />
         </radialGradient>
       </defs>
       <circle cx="${cx}" cy="${cy}" r="118" fill="url(#hubGlow)" />
       <g class="topo-edges">${edgesSvg.join('')}</g>
       <g class="topo-hub">
-        <rect x="${cx - 108}" y="${cy - 34}" width="216" height="68" rx="12" fill="var(--surface-1)" stroke="#38bdf8" stroke-width="1.5" />
+        <rect x="${cx - 108}" y="${cy - 34}" width="216" height="68" rx="10" fill="var(--surface-1)" stroke="var(--border-strong)" stroke-width="1.25" />
         <text x="${cx}" y="${cy - 8}" text-anchor="middle" fill="var(--text-primary)" font-size="12.5" font-weight="700" font-family="var(--font-mono)">${esc(centerLabel)}</text>
         <text x="${cx}" y="${cy + 14}" text-anchor="middle" fill="var(--text-muted)" font-size="10" font-family="var(--font-mono)">${esc(centerSub)}</text>
       </g>

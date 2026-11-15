@@ -477,6 +477,41 @@ async function serveStatic(req, res, pathname) {
   }
 }
 
+const UUID_RE = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i;
+const ROOT_DOMAIN_RE = /^[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?(?:\.[a-z0-9](?:[a-z0-9-]{0,61}[a-z0-9])?)+$/i;
+
+async function proxyUpstreamJson(targetUrl, { method = 'GET', timeoutMs = 15_000 } = {}) {
+  let upstream;
+  try {
+    upstream = await fetch(targetUrl, {
+      method,
+      signal: AbortSignal.timeout(timeoutMs),
+      headers: {
+        Accept: 'application/json',
+        'User-Agent': 'DevTrace/1.0 (+https://github.com/robloxgamee1231-ctrl/Dev)'
+      }
+    });
+  } catch (err) {
+    throw Object.assign(
+      new Error(`Upstream request failed: ${err?.message || 'network unreachable'}`),
+      { status: 502, code: 'NETWORK_RESTRICTED' }
+    );
+  }
+
+  if (upstream.status === 204) {
+    return { status: 204, body: null };
+  }
+
+  const text = await readBoundedText(upstream, MAX_FILE_BYTES);
+  let parsed = null;
+  try {
+    parsed = text ? JSON.parse(text) : null;
+  } catch {
+    parsed = { error: text.slice(0, 240) || `HTTP ${upstream.status}` };
+  }
+  return { status: upstream.status, body: parsed };
+}
+
 export function createAppServer({ allowLocalTest = false } = {}) {
   return http.createServer(async (req, res) => {
     try {
@@ -500,6 +535,73 @@ export function createAppServer({ allowLocalTest = false } = {}) {
           allowLocalTest: allowLocalTest || process.env.ALLOW_LOCAL_TEST_TARGETS === '1'
         });
         return sendJson(res, 200, report);
+      }
+
+      // Proxy: Subdomain API (https://api.subdomain.app/v1/query?domain=...)
+      if (pathname === '/api/subdomains' && req.method === 'GET') {
+        let domain = String(reqUrl.searchParams.get('domain') || '').trim().toLowerCase();
+        domain = domain.replace(/^https?:\/\//i, '').split('/')[0].split(':')[0].replace(/^www\./i, '');
+        if (!domain || !ROOT_DOMAIN_RE.test(domain)) {
+          return sendJson(res, 400, { error: 'Enter a valid domain like example.com.' });
+        }
+        const result = await proxyUpstreamJson(
+          `https://api.subdomain.app/v1/query?domain=${encodeURIComponent(domain)}`,
+          { method: 'GET', timeoutMs: 45_000 }
+        );
+        return sendJson(res, result.status, result.body ?? {});
+      }
+
+      // Proxy: ThrowawayMail API (https://throwawaymail.app/api/mailboxes...)
+      if (pathname === '/api/mailboxes' && req.method === 'POST') {
+        const result = await proxyUpstreamJson('https://throwawaymail.app/api/mailboxes', {
+          method: 'POST',
+          timeoutMs: 15_000
+        });
+        return sendJson(res, result.status, result.body ?? {});
+      }
+
+      const mailboxMatch = pathname.match(/^\/api\/mailboxes\/([^/]+)$/);
+      if (mailboxMatch && (req.method === 'GET' || req.method === 'DELETE')) {
+        const mailboxId = mailboxMatch[1];
+        if (!UUID_RE.test(mailboxId)) {
+          return sendJson(res, 400, { error: 'Invalid mailbox_id format (expected UUID).' });
+        }
+        const result = await proxyUpstreamJson(
+          `https://throwawaymail.app/api/mailboxes/${encodeURIComponent(mailboxId)}`,
+          { method: req.method, timeoutMs: 15_000 }
+        );
+        if (result.status === 204) {
+          res.writeHead(204, { 'Cache-Control': 'no-store' });
+          res.end();
+          return;
+        }
+        return sendJson(res, result.status, result.body ?? {});
+      }
+
+      const listMsgMatch = pathname.match(/^\/api\/mailboxes\/([^/]+)\/messages$/);
+      if (listMsgMatch && req.method === 'GET') {
+        const mailboxId = listMsgMatch[1];
+        if (!UUID_RE.test(mailboxId)) {
+          return sendJson(res, 400, { error: 'Invalid mailbox_id format (expected UUID).' });
+        }
+        const result = await proxyUpstreamJson(
+          `https://throwawaymail.app/api/mailboxes/${encodeURIComponent(mailboxId)}/messages`,
+          { method: 'GET', timeoutMs: 15_000 }
+        );
+        return sendJson(res, result.status, result.body ?? []);
+      }
+
+      const singleMsgMatch = pathname.match(/^\/api\/mailboxes\/([^/]+)\/messages\/([^/]+)$/);
+      if (singleMsgMatch && req.method === 'GET') {
+        const [, mailboxId, messageId] = singleMsgMatch;
+        if (!UUID_RE.test(mailboxId) || !UUID_RE.test(messageId)) {
+          return sendJson(res, 400, { error: 'Invalid mailbox_id or message_id format.' });
+        }
+        const result = await proxyUpstreamJson(
+          `https://throwawaymail.app/api/mailboxes/${encodeURIComponent(mailboxId)}/messages/${encodeURIComponent(messageId)}`,
+          { method: 'GET', timeoutMs: 15_000 }
+        );
+        return sendJson(res, result.status, result.body ?? {});
       }
 
       if (req.method === 'GET' || req.method === 'HEAD') {

@@ -4,75 +4,85 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <title>DevTrace — Temp Mail, Subdomains & Site Code Inspector</title>
-  <meta name="description" content="Unified Z.ai-style developer HUD: disposable Temp Mail, Subdomain discovery, and Site Code & Build Stack Inspector." />
+  <meta name="description" content="Liquid Glass developer HUD: working disposable Temp Mail, Subdomain discovery, and Site Code & Build Stack Inspector." />
   <link rel="stylesheet" href="./styles/main.css" />
 </head>
 <body>
+  <!-- Ambient Liquid Glass Atmospheric Refraction Layer -->
+  <div class="liquid-backdrop" aria-hidden="true">
+    <div class="liquid-orb orb-1"></div>
+    <div class="liquid-orb orb-2"></div>
+    <div class="liquid-orb orb-3"></div>
+    <div class="liquid-mesh"></div>
+  </div>
+
   <div class="app-shell">
-    <!-- Z.ai Monochrome HUD Topbar with 3 Primary Tabs -->
-    <header class="topbar">
-      <div class="topbar-left">
-        <a href="./" class="brand" id="brandReset" title="DevTrace HUD">
-          <span class="brand-mark" aria-hidden="true">
-            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round">
-              <path d="M5 6h14L5 18h14"></path>
-            </svg>
+    <!-- Floating Liquid Glass HUD Dock -->
+    <div class="topbar-wrap">
+      <header class="topbar glass-nav">
+        <div class="topbar-left">
+          <a href="./" class="brand" id="brandReset" title="DevTrace Liquid Glass HUD">
+            <span class="brand-mark" aria-hidden="true">
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.3" stroke-linecap="round" stroke-linejoin="round">
+                <path d="M5 6h14L5 18h14"></path>
+              </svg>
+            </span>
+            <span class="brand-name">DevTrace</span>
+          </a>
+          <span class="engine-pill" id="engineStatusPill" title="Active scan transport">
+            <span class="dot"></span>
+            <span id="engineStatusText">Connecting…</span>
           </span>
-          <span class="brand-name">DevTrace</span>
-        </a>
-        <span class="engine-pill" id="engineStatusPill" title="Active scan transport">
-          <span class="dot"></span>
-          <span id="engineStatusText">Connecting…</span>
-        </span>
-      </div>
+        </div>
 
-      <!-- 3 Top HUD Tabs -->
-      <nav class="hud-tabs" role="tablist" aria-label="Primary Workspace">
-        <button type="button" class="hud-tab active" data-hud-tab="tempmail" role="tab" aria-selected="true">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
-          <span>Temp Mail</span>
-        </button>
-        <button type="button" class="hud-tab" data-hud-tab="subdomains" role="tab" aria-selected="false">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 4 9 14 14 0 0 1-4 9 14 14 0 0 1-4-9 14 14 0 0 1 4-9z"/></svg>
-          <span>Subdomains</span>
-        </button>
-        <button type="button" class="hud-tab" data-hud-tab="inspector" role="tab" aria-selected="false">
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
-          <span>Site Inspector</span>
-        </button>
-      </nav>
+        <!-- 3 Primary Liquid Glass Segmented Tabs -->
+        <nav class="hud-tabs" role="tablist" aria-label="Primary Workspace">
+          <button type="button" class="hud-tab active" data-hud-tab="tempmail" role="tab" aria-selected="true">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><rect x="2" y="4" width="20" height="16" rx="2"/><polyline points="22,6 12,13 2,6"/></svg>
+            <span>Temp Mail</span>
+          </button>
+          <button type="button" class="hud-tab" data-hud-tab="subdomains" role="tab" aria-selected="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="9"/><line x1="3" y1="12" x2="21" y2="12"/><path d="M12 3a14 14 0 0 1 4 9 14 14 0 0 1-4 9 14 14 0 0 1-4-9 14 14 0 0 1 4-9z"/></svg>
+            <span>Subdomains</span>
+          </button>
+          <button type="button" class="hud-tab" data-hud-tab="inspector" role="tab" aria-selected="false">
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="16 18 22 12 16 6"/><polyline points="8 6 2 12 8 18"/></svg>
+            <span>Site Inspector</span>
+          </button>
+        </nav>
 
-      <div class="topbar-right">
-        <button type="button" class="btn btn-ghost btn-xs" id="historyBtn" title="Inspector Scan History">
-          <span>History</span>
-          <span class="pill-count" id="historyCount">0</span>
-        </button>
-        <button type="button" class="btn btn-ghost btn-xs" id="workerGuideBtn" title="GitHub Pages Proxy Setup">
-          <span>Proxy</span>
-        </button>
-        <button type="button" class="btn btn-ghost btn-icon" id="themeToggle" title="Toggle Dark / Light Theme" aria-label="Toggle Theme">
-          <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
-        </button>
-      </div>
-    </header>
+        <div class="topbar-right">
+          <button type="button" class="btn btn-glass btn-xs" id="historyBtn" title="Inspector Scan History">
+            <span>History</span>
+            <span class="pill-count" id="historyCount">0</span>
+          </button>
+          <button type="button" class="btn btn-glass btn-xs" id="workerGuideBtn" title="Optional Worker Proxy">
+            <span>Proxy</span>
+          </button>
+          <button type="button" class="btn btn-glass btn-icon" id="themeToggle" title="Toggle Dark / Light Glass" aria-label="Toggle Theme">
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="4"/><path d="M12 2v2M12 20v2M4.93 4.93l1.41 1.41M17.66 17.66l1.41 1.41M2 12h2M20 12h2M6.34 17.66l-1.41 1.41M19.07 4.93l-1.41 1.41"/></svg>
+          </button>
+        </div>
+      </header>
+    </div>
 
     <!-- Single-Tab Active Workspace Container -->
     <main class="main-wrap">
-      <!-- TAB 1: TEMP MAIL (throwawaymail.app) -->
+      <!-- TAB 1: TEMP MAIL -->
       <section class="hud-panel" id="panel-tempmail" data-hud-panel="tempmail" aria-label="Temp Mail"></section>
 
-      <!-- TAB 2: SUBDOMAINS (api.subdomain.app) -->
+      <!-- TAB 2: SUBDOMAINS -->
       <section class="hud-panel hidden" id="panel-subdomains" data-hud-panel="subdomains" aria-label="Subdomains"></section>
 
-      <!-- TAB 3: SITE INSPECTOR (DevTrace Code, Domains & Build Stack) -->
+      <!-- TAB 3: SITE INSPECTOR -->
       <section class="hud-panel hidden" id="panel-inspector" data-hud-panel="inspector" aria-label="Site Inspector">
         <div class="zai-hero">
           <h1 class="zai-title">Site Code &amp; Build Stack Inspector</h1>
-          <p class="zai-subtitle">Crawls HTML, JS bundles, CSS, HTTP headers, and GitHub repositories to uncover dev/staging domains and 95+ build stack technologies.</p>
+          <p class="zai-subtitle">Inspects live websites, linked JS bundles, DNS records, and GitHub repos to uncover dev/staging domains and 95+ build stack technologies.</p>
         </div>
 
-        <!-- Z.ai Composer Card for Site Inspector -->
-        <div class="zai-composer">
+        <!-- Liquid Glass Composer Card for Site Inspector -->
+        <div class="zai-composer glass-surface">
           <!-- Website URL Form -->
           <form class="scan-form" id="websiteForm" data-mode-panel="website">
             <div class="composer-main-row">
@@ -80,7 +90,7 @@
                 type="text"
                 id="websiteInput"
                 class="composer-input mono"
-                placeholder="Enter website URL to inspect source code (e.g. https://github.com)…"
+                placeholder="Enter website URL or GitHub repo (e.g. https://vercel.com or vitejs/vite)…"
                 autocomplete="off"
                 spellcheck="false"
               />
@@ -108,7 +118,7 @@
             <div class="source-textarea-wrap">
               <div class="source-bar">
                 <input type="text" id="sourceLabelInput" class="code-input compact" placeholder="Origin or label (optional, e.g. https://acme.io)" />
-                <label class="btn btn-ghost btn-xs file-btn">
+                <label class="btn btn-glass btn-xs file-btn">
                   <input type="file" id="sourceFileInput" multiple accept=".html,.htm,.js,.mjs,.cjs,.ts,.tsx,.jsx,.css,.scss,.json,.har,.txt,.yml,.yaml,.toml,.env,.xml,.md" hidden />
                   Upload Files / HAR
                 </label>
@@ -123,14 +133,14 @@
               <div class="drop-footer">
                 <span id="droppedFilesList" class="muted-text">No files attached · HTML, JS, CSS, JSON, YAML, TOML, .HAR</span>
                 <div class="drop-actions">
-                  <button type="button" class="btn btn-ghost btn-xs" id="clearSourceBtn">Clear</button>
+                  <button type="button" class="btn btn-glass btn-xs" id="clearSourceBtn">Clear</button>
                   <button type="submit" class="btn btn-primary btn-xs">Analyze Source</button>
                 </div>
               </div>
             </div>
           </form>
 
-          <!-- Integrated Z.ai Composer Bottom Strip -->
+          <!-- Integrated Composer Bottom Strip -->
           <div class="composer-footer-row">
             <div class="composer-mode-pills" role="tablist" aria-label="Inspector Input Mode">
               <button type="button" class="mode-tab active" data-mode="website" role="tab" aria-selected="true">Website URL</button>
@@ -138,7 +148,7 @@
               <button type="button" class="mode-tab" data-mode="source" role="tab" aria-selected="false">Raw Code / HAR</button>
             </div>
             <div class="composer-meta-right">
-              <button type="button" class="btn btn-ghost btn-xs" id="optionsToggleBtn" aria-expanded="false">Options</button>
+              <button type="button" class="btn btn-glass btn-xs" id="optionsToggleBtn" aria-expanded="false">Options</button>
             </div>
           </div>
 
@@ -175,44 +185,44 @@
           </div>
         </div>
 
-        <!-- Outcome / Quick Presets -->
+        <!-- Quick Presets -->
         <div class="preset-strip centered">
           <span class="preset-label">Presets:</span>
           <button type="button" class="preset-chip" data-preset="sample">Demo: Multi-Env App</button>
-          <button type="button" class="preset-chip" data-preset="url:https://github.com">URL: github.com</button>
+          <button type="button" class="preset-chip" data-preset="url:https://vercel.com">URL: vercel.com</button>
           <button type="button" class="preset-chip" data-preset="git:vitejs/vite">GitHub: vitejs/vite</button>
           <button type="button" class="preset-chip" data-preset="git:withastro/astro">GitHub: withastro/astro</button>
           <button type="button" class="preset-chip" data-preset="git:vercel/next.js">GitHub: vercel/next.js</button>
         </div>
 
         <!-- Status Banner -->
-        <div class="status-banner hidden" id="statusBanner" role="status" aria-live="polite"></div>
+        <div class="status-banner glass-surface hidden" id="statusBanner" role="status" aria-live="polite"></div>
 
         <!-- Empty Capabilities Cards -->
         <div class="intro-grid" id="emptyState">
-          <article class="intro-card">
+          <article class="intro-card glass-surface">
             <div class="intro-icon amber">DEV</div>
             <h3>Dev, Staging &amp; Preview Radar</h3>
             <p>Finds <code>dev.*</code>, <code>staging.*</code>, <code>qa.*</code>, <code>*.vercel.app</code>, <code>*.netlify.app</code>, <code>*.pages.dev</code>, tunnels, and localhost ports inside site code and headers.</p>
           </article>
-          <article class="intro-card">
+          <article class="intro-card glass-surface">
             <div class="intro-icon">DOM</div>
-            <h3>Clean Domain Extraction</h3>
-            <p>Extracts full URLs, quoted hosts, WebSockets, and CSP endpoints while stripping JS property noise. Groups by host and apex with line-level snippets.</p>
+            <h3>Clean Domain + DNS Extraction</h3>
+            <p>Extracts full URLs, quoted hosts, WebSockets, CSP endpoints, and live DNS records while stripping JS property noise with exact line evidence.</p>
           </article>
-          <article class="intro-card">
+          <article class="intro-card glass-surface">
             <div class="intro-icon">STK</div>
             <h3>95+ Build Stack Fingerprints</h3>
-            <p>Detects frameworks, bundlers, CSS systems, CMS/builders, edge hosts, package managers, and exact versions straight from DOM markers, bundles, and repo configs.</p>
+            <p>Detects frameworks, bundlers, CSS systems, CMS/builders, edge hosts, package managers, and exact versions straight from DOM markers, bundles, and repos.</p>
           </article>
         </div>
 
         <!-- Inspector Results Workspace -->
         <div class="workspace hidden" id="resultsWorkspace">
-          <div class="report-banner" id="reportBanner"></div>
+          <div class="report-banner glass-surface" id="reportBanner"></div>
           <div class="kpi-strip" id="kpiStrip"></div>
 
-          <div class="subtabs-bar">
+          <div class="subtabs-bar glass-surface">
             <div class="subtabs" role="tablist" id="resultTabs">
               <button type="button" class="subtab active" data-tab="overview" role="tab">Overview</button>
               <button type="button" class="subtab" data-tab="dev" role="tab">
@@ -229,10 +239,10 @@
               </button>
             </div>
             <div class="export-actions">
-              <button type="button" class="btn btn-ghost btn-xs" id="copyDevBtn">Copy Dev Hosts</button>
-              <button type="button" class="btn btn-ghost btn-xs" id="exportJsonBtn">JSON</button>
-              <button type="button" class="btn btn-ghost btn-xs" id="exportCsvBtn">CSV</button>
-              <button type="button" class="btn btn-ghost btn-xs" id="exportMdBtn">Markdown</button>
+              <button type="button" class="btn btn-glass btn-xs" id="copyDevBtn">Copy Dev Hosts</button>
+              <button type="button" class="btn btn-glass btn-xs" id="exportJsonBtn">JSON</button>
+              <button type="button" class="btn btn-glass btn-xs" id="exportCsvBtn">CSV</button>
+              <button type="button" class="btn btn-glass btn-xs" id="exportMdBtn">Markdown</button>
             </div>
           </div>
 
@@ -244,27 +254,27 @@
 
   <!-- Slide-Over Evidence Inspector Drawer -->
   <div class="drawer-backdrop hidden" id="drawerBackdrop"></div>
-  <aside class="drawer hidden" id="evidenceDrawer" aria-label="Domain Evidence Inspector">
+  <aside class="drawer glass-drawer hidden" id="evidenceDrawer" aria-label="Domain Evidence Inspector">
     <div class="drawer-header">
       <div>
         <span class="drawer-eyebrow" id="drawerEyebrow">HOST EVIDENCE</span>
         <h2 class="drawer-title" id="drawerTitle"></h2>
       </div>
-      <button type="button" class="btn btn-ghost btn-icon" id="drawerCloseBtn" aria-label="Close drawer">✕</button>
+      <button type="button" class="btn btn-glass btn-icon" id="drawerCloseBtn" aria-label="Close drawer">✕</button>
     </div>
     <div class="drawer-body" id="drawerBody"></div>
   </aside>
 
   <!-- History Drawer -->
-  <aside class="drawer hidden" id="historyDrawer" aria-label="Scan History">
+  <aside class="drawer glass-drawer hidden" id="historyDrawer" aria-label="Scan History">
     <div class="drawer-header">
       <div>
         <span class="drawer-eyebrow">LOCAL ARCHIVE</span>
         <h2 class="drawer-title">Recent Inspector Scans</h2>
       </div>
       <div class="row-gap">
-        <button type="button" class="btn btn-ghost btn-xs" id="clearHistoryBtn">Clear All</button>
-        <button type="button" class="btn btn-ghost btn-icon" id="historyCloseBtn" aria-label="Close history">✕</button>
+        <button type="button" class="btn btn-glass btn-xs" id="clearHistoryBtn">Clear All</button>
+        <button type="button" class="btn btn-glass btn-icon" id="historyCloseBtn" aria-label="Close history">✕</button>
       </div>
     </div>
     <div class="drawer-body" id="historyBody"></div>
@@ -272,19 +282,19 @@
 
   <!-- GitHub Pages & Worker Setup Modal -->
   <div class="modal hidden" id="workerModal" role="dialog" aria-modal="true" aria-labelledby="workerModalTitle">
-    <div class="modal-card">
+    <div class="modal-card glass-drawer">
       <div class="drawer-header">
         <div>
-          <span class="drawer-eyebrow">GITHUB PAGES PROXY</span>
-          <h2 class="drawer-title" id="workerModalTitle">Cloudflare Worker Proxy (Optional)</h2>
+          <span class="drawer-eyebrow">OPTIONAL PROXY</span>
+          <h2 class="drawer-title" id="workerModalTitle">Cloudflare Worker Proxy</h2>
         </div>
-        <button type="button" class="btn btn-ghost btn-icon" id="workerModalClose" aria-label="Close">✕</button>
+        <button type="button" class="btn btn-glass btn-icon" id="workerModalClose" aria-label="Close">✕</button>
       </div>
       <div class="modal-body">
-        <p class="modal-p">DevTrace works statically on GitHub Pages and locally with <code>npm start</code>. For CORS-free <strong>Temp Mail</strong>, <strong>Subdomains</strong>, and full HTTP response headers in <strong>Site Inspector</strong> from GitHub Pages, deploy <code>worker/cloudflare-worker.js</code> to Cloudflare Workers (free tier) and paste its URL under <strong>Site Inspector → Options → Custom Worker Proxy URL</strong>.</p>
+        <p class="modal-p">All three tools (<strong>Temp Mail</strong>, <strong>Subdomains</strong>, and <strong>Site Inspector</strong>) now work out of the box directly on GitHub Pages via CORS-native APIs &amp; multi-relay fallback. Optionally deploy <code>worker/cloudflare-worker.js</code> to Cloudflare Workers (free tier) if you want direct <code>throwawaymail.app</code> mailboxes or full raw HTTP response headers from static Pages.</p>
         <div class="code-block-header">
           <span>worker/cloudflare-worker.js</span>
-          <button type="button" class="btn btn-ghost btn-xs" id="copyWorkerCodeBtn">Copy Worker Code</button>
+          <button type="button" class="btn btn-glass btn-xs" id="copyWorkerCodeBtn">Copy Worker Code</button>
         </div>
         <pre class="code-viewer small" id="workerCodePreview">Loading worker/cloudflare-worker.js…</pre>
       </div>
